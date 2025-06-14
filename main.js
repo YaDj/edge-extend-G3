@@ -2,7 +2,7 @@ import { createProgram, loadShaderSource, createTexture, createFramebuffer } fro
 
 // --- Елементи DOM, WebGL контекст ---
 const canvas = document.getElementById('glcanvas');
-const gl = canvas.getContext('webgl2', { alpha: false, antialias: true }); // alpha: false для основного канвасу
+const gl = canvas.getContext('webgl2', { alpha: false, antialias: true });
 if (!gl) { throw new Error('WebGL2 not available'); }
 
 const radiusSlider = document.getElementById('radiusSlider');
@@ -212,7 +212,7 @@ async function main() {
 	if (!programBlur || !programFinal) { return; }
 
 	quadBuffer = gl.createBuffer();
-	drawFullScreenQuad(); // <-- Тепер ця функція визначена до виклику
+	drawFullScreenQuad();
 	resizeCanvasToDisplaySize();
 
 	imageLoader.addEventListener('change', handleImageUpload);
