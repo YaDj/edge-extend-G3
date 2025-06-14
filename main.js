@@ -25,7 +25,7 @@ let currentImage = null;
 let originalFileName = 'image';
 let shrinkAmount = 1.0;
 let shrinkBlur = 0.0;
-let showOriginalOnTop = true;
+let showOriginalOnTop = false;
 
 // --- Оголошення ВСІХ функцій-помічників ---
 
@@ -73,24 +73,30 @@ function render() {
 	drawFullScreenQuad();
 	gl.disable(gl.BLEND);
 
+	// 1. Розмиття X -> fbo1
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	drawPass(programBlur, originalTexture, { radius, texelSize: [1 / imgW, 1 / imgH], direction: [1, 0] });
 
+	// 2. Розмиття Y -> fbo2
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	drawPass(programBlur, fbo1.texture, { radius, texelSize: [1 / imgW, 1 / imgH], direction: [0, 1] });
 
+	// --- Композитинг у фінальний outputFBO ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	gl.clearColor(0, 0, 0, 1);
+	gl.clearColor(0, 0, 0, 1); // Заливаємо непрозорим чорним
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
+	// 3. Малюємо фон (розмитий шар з виправленим кольором)
+	// Використовуємо спеціальний сигнал shrinkAmount: -1.0, щоб шейдер зрозумів, що потрібно виправити колір.
 	drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
 
+	// 4. Якщо потрібно, накладаємо верхній шар
 	if (showOriginalOnTop) {
 		gl.enable(gl.BLEND);
-		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // Стандартний блендінг
 		drawPass(programFinal, originalTexture, {
 			shrinkAmount: shrinkAmount,
 			shrinkBlur: shrinkBlur,
@@ -99,6 +105,7 @@ function render() {
 		gl.disable(gl.BLEND);
 	}
 
+	// --- Відображення на екрані ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -108,6 +115,8 @@ function render() {
 	if (imgAspect > canvasAspect) { vpW = gl.canvas.width; vpH = Math.round(vpW / imgAspect); vpX = 0; vpY = Math.round((gl.canvas.height - vpH) / 2); }
 	else { vpH = gl.canvas.height; vpW = Math.round(vpH * imgAspect); vpY = 0; vpX = Math.round((gl.canvas.width - vpW) / 2); }
 	gl.viewport(vpX, vpY, vpW, vpH);
+
+	// Просто малюємо готовий результат з outputFBO, без додаткових ефектів
 	drawPass(programFinal, outputFBO.texture, {});
 }
 
@@ -124,7 +133,9 @@ function setupResources() {
 	fbo1 = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	fbo2 = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	outputFBO = createFramebuffer(gl, imageSize[0], imageSize[1]);
-	render();
+	if (document.readyState === 'complete') {
+		render();
+	}
 }
 
 function handleImageUpload(event) {
