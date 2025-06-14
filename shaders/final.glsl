@@ -29,10 +29,10 @@ void main() {
   }
 
     // --- Шлях 2: Рендер ВЕРХНЬОГО ШАРУ з ефектами Shrink ---
-  if (u_shrinkBlur <= 0.0 && u_shrinkAmount <= 0.0) {
-    outColor = baseColor;
-    return;
-  }
+	if (u_shrinkBlur <= 0.0 && u_shrinkAmount <= 0.0) {
+	outColor = vec4(baseColor.rgb * baseColor.a, baseColor.a);
+	return;
+	}
 
   float sumAlpha = 0.0;
   float count = 0.0;

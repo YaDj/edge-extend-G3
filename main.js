@@ -25,7 +25,7 @@ let currentImage = null;
 let originalFileName = 'image';
 let shrinkAmount = 1.0;
 let shrinkBlur = 0.0;
-let showOriginalOnTop = false;
+let showOriginalOnTop = true;
 
 // --- Оголошення ВСІХ функцій-помічників ---
 
