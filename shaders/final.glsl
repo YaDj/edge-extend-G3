@@ -12,9 +12,8 @@ uniform float u_shrinkBlur;
 // Функція для відновлення яскравості (un-premultiply) і встановлення непрозорості
 vec4 fixPremultipliedColor(vec4 color) {
   if (color.a < 0.001) {
-        return vec4(0.0, 0.0, 0.0, 1.0); // Повністю непрозорий чорний
+        return vec4(0.0, 0.0, 0.0, 1.0);
   }
-    // Повертаємо колір з відновленою яскравістю і робимо його повністю непрозорим
     return vec4(color.rgb / color.a, 1.0);
 }
 
@@ -22,36 +21,46 @@ void main() {
   vec4 baseColor = texture(u_image, v_uv);
 
     // --- Шлях 1: Рендер РОЗМИТОГО ФОНУ ---
-    // Якщо shrinkAmount == -1.0, це спеціальний сигнал від main.js, що потрібно виправити колір.
   if (u_shrinkAmount < -0.5) { 
         outColor = fixPremultipliedColor(baseColor);
     return;
   }
 
-    // --- Шлях 2: Рендер ВЕРХНЬОГО ШАРУ з ефектами Shrink ---
+    // --- Шлях 2: Рендер ВЕРХНЬОГО ШАРУ з ефектом EROSION ---
+    
+    // Якщо ефекти вимкнені, просто конвертуємо в premultiplied alpha для блендінгу
 	if (u_shrinkBlur <= 0.0 && u_shrinkAmount <= 0.0) {
 	outColor = vec4(baseColor.rgb * baseColor.a, baseColor.a);
 	return;
 	}
 
-  float sumAlpha = 0.0;
-  float count = 0.0;
-  int kernelRadius = int(ceil(u_shrinkBlur));
+    // КРОК 1: ЕРОЗІЯ. Знаходимо мінімальну альфу в радіусі u_shrinkAmount.
+    float minAlpha = 1.0;
+    int kernelRadius = int(ceil(u_shrinkAmount));
+
   for (int y = -kernelRadius; y <= kernelRadius; ++y) {
     for (int x = -kernelRadius; x <= kernelRadius; ++x) {
-      if (length(vec2(float(x), float(y))) > u_shrinkBlur) continue;
+            // Перевіряємо, чи піксель знаходиться всередині кругового ядра
+            if (length(vec2(float(x), float(y))) > u_shrinkAmount) {
+                continue;
+            }
       vec2 offset = vec2(float(x), float(y)) * u_texelSize;
-      sumAlpha += texture(u_image, v_uv + offset).a;
-      count += 1.0;
+            minAlpha = min(minAlpha, texture(u_image, v_uv + offset).a);
     }
   }
 
-  float avgAlpha = (count > 0.0) ? sumAlpha / count : baseColor.a;
-  float shrinkOffset = u_shrinkAmount * 0.05;
-  float biasedAlpha = avgAlpha - shrinkOffset;
-  float smoothedAlpha = smoothstep(0.4, 0.6, biasedAlpha); 
+    // КРОК 2: КОНТРОЛЬ ЖОРСТКОСТІ КРАЮ. Використовуємо u_shrinkBlur.
+    // Перетворюємо лінійне значення minAlpha на криву за допомогою smoothstep.
+    // u_shrinkBlur контролює "ширину" цього переходу.
+    float hardness = 0.5 - (u_shrinkBlur * 0.1); // Чим більший blur, тим м'якший край
+    hardness = max(0.0, hardness); // Захист від від'ємних значень
+
+    float smoothedAlpha = smoothstep(hardness, 0.5, minAlpha);
+    
+    // Завжди беремо мінімум між оригінальною альфою і результатом ерозії,
+    // щоб ефект не "виходив" за межі оригінального зображення.
   float finalAlpha = min(baseColor.a, smoothedAlpha);
   
-// НОВИЙ РЯДОК: Множимо колір на альфу прямо в шейдері
+    // Конвертуємо в premultiplied alpha для коректного блендінгу
 outColor = vec4(baseColor.rgb * finalAlpha, finalAlpha);
 }
