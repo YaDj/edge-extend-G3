@@ -96,7 +96,8 @@ function render() {
 	// 4. Якщо потрібно, накладаємо верхній шар
 	if (showOriginalOnTop) {
 		gl.enable(gl.BLEND);
-		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // Стандартний блендінг
+		// НОВИЙ БЛЕНДІНГ: Для попередньо помноженої альфи
+		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 		drawPass(programFinal, originalTexture, {
 			shrinkAmount: shrinkAmount,
 			shrinkBlur: shrinkBlur,

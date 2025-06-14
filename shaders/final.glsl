@@ -52,5 +52,6 @@ void main() {
   float smoothedAlpha = smoothstep(0.4, 0.6, biasedAlpha); 
   float finalAlpha = min(baseColor.a, smoothedAlpha);
   
-  outColor = vec4(baseColor.rgb, finalAlpha);
+// НОВИЙ РЯДОК: Множимо колір на альфу прямо в шейдері
+outColor = vec4(baseColor.rgb * finalAlpha, finalAlpha);
 }
