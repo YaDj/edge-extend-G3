@@ -132,7 +132,7 @@ function render() {
 		drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
 
 		// Шар 3: Чіткий результат ерозії - накладаємо на фон + ауру
-		drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
+		//drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
 
 		gl.disable(gl.BLEND);
 	}

@@ -10,8 +10,10 @@ uniform float u_shrinkAmount;
 uniform float u_shrinkBlur;
 
 vec4 fixPremultipliedColor(vec4 color) {
-    if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 1.0); }
-    return vec4(color.rgb / color.a, 1.0);
+    if (color.a < 0.001) {
+        return vec4(0.0, 0.0, 0.0, 0.0);
+    }
+    return vec4(color.rgb / color.a, color.a);
 }
 
 void main() {
