@@ -26,7 +26,7 @@ void main() {
     return;
   }
 
-    // --- Шлях 2: Рендер ВЕРХНЬОГО ШАРУ з ефектом EROSION ---
+    // --- Шлях 2: Рендер ВЕРХНЬОГО ШАРУ з ефектом EROSION + SOFTENING ---
     
     // Якщо ефекти вимкнені, просто конвертуємо в premultiplied alpha для блендінгу
 	if (u_shrinkBlur <= 0.0 && u_shrinkAmount <= 0.0) {
@@ -38,19 +38,24 @@ void main() {
     float minAlpha = 1.0;
     int kernelRadius = int(ceil(u_shrinkAmount));
 
+    if (kernelRadius > 0) {
   for (int y = -kernelRadius; y <= kernelRadius; ++y) {
     for (int x = -kernelRadius; x <= kernelRadius; ++x) {
-            // Перевіряємо, чи піксель знаходиться всередині кругового ядра
             if (length(vec2(float(x), float(y))) > u_shrinkAmount) {
                 continue;
             }
       vec2 offset = vec2(float(x), float(y)) * u_texelSize;
             minAlpha = min(minAlpha, texture(u_image, v_uv + offset).a);
     }
+        }
+    } else {
+        // Якщо ерозія вимкнена, беремо альфу поточного пікселя
+        minAlpha = baseColor.a;
   }
 
-    // КРОК 2: КОНТРОЛЬ ЖОРСТКОСТІ КРАЮ.
-	float softness_power = 1.0 + u_shrinkBlur * 3.0;
+    // КРОК 2: КОНТРОЛЬ ЖОРСТКОСТІ КРАЮ (фінальна, правильна версія)
+    // u_shrinkBlur контролює степінь кривої. Чим він більший, тим м'якший край.
+    float softness_power = 1.0 + u_shrinkBlur; // Проста і надійна формула
 	float smoothedAlpha = pow(minAlpha, softness_power);
     
     // Завжди беремо мінімум між оригінальною альфою і результатом ерозії,
