@@ -18,7 +18,7 @@ const blendCheckbox = document.getElementById('blendCheckbox');
 
 // --- Глобальні змінні ---
 let programBlur, programFinal;
-let originalTexture, fbo1, fbo2, outputFBO;
+let originalTexture, fbo1, fbo2, outputFBO, fboShrunk, fboShrunkBlurred;
 let quadBuffer;
 let imageSize = [0, 0];
 let currentImage = null;
@@ -72,64 +72,83 @@ function drawPass(program, inputTexture, uniforms = {}) {
 
 function render() {
 	if (!originalTexture) return;
+
+	// Отримуємо значення з повзунків
 	const radius = parseFloat(radiusSlider.value);
+	const shrinkBlurValue = parseFloat(shrinkBlurSlider.value);
 	radiusLabel.textContent = radius.toFixed(1);
 	const [imgW, imgH] = imageSize;
+	const texelSize = [1 / imgW, 1 / imgH];
 
 	drawFullScreenQuad();
 	gl.disable(gl.BLEND);
 
-	// 1. Розмиття X -> fbo1
+	// --- ЕТАП 1: Рендер основного розмитого фону ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programBlur, originalTexture, { radius, texelSize: [1 / imgW, 1 / imgH], direction: [1, 0] });
+	drawPass(programBlur, originalTexture, { radius, texelSize, direction: [1, 0] });
 
-	// 2. Розмиття Y -> fbo2
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programBlur, fbo1.texture, { radius, texelSize: [1 / imgW, 1 / imgH], direction: [0, 1] });
+	drawPass(programBlur, fbo1.texture, { radius, texelSize, direction: [0, 1] });
 
-	// --- Композитинг у фінальний outputFBO ---
+
+	// --- ЕТАП 2 (опціональний): Створення шарів для блендінгу ---
+	if (showOriginalOnTop) {
+		// 2a: Створюємо чіткий шар з ерозією (Layer 3) -> fboShrunk
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fboShrunk.fbo);
+		gl.viewport(0, 0, imgW, imgH);
+		gl.clearColor(0, 0, 0, 0); // Очищуємо з прозорістю
+		gl.clear(gl.COLOR_BUFFER_BIT);
+		drawPass(programFinal, originalTexture, { shrinkAmount, shrinkBlur: shrinkBlurValue, texelSize });
+
+		// 2b: Розмиваємо результат ерозії (Layer 2) -> fboShrunkBlurred
+		// Використовуємо fbo1 як тимчасовий буфер для розмиття по X
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
+		gl.viewport(0, 0, imgW, imgH);
+		drawPass(programBlur, fboShrunk.texture, { radius: shrinkBlurValue, texelSize, direction: [1, 0] });
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fboShrunkBlurred.fbo);
+		gl.viewport(0, 0, imgW, imgH);
+		drawPass(programBlur, fbo1.texture, { radius: shrinkBlurValue, texelSize, direction: [0, 1] });
+	}
+
+
+	// --- ЕТАП 3: Фінальний композитинг в outputFBO ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	gl.clearColor(0, 0, 0, 1); // Заливаємо непрозорим чорним
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
-	// 3. Малюємо фон (розмитий шар з виправленим кольором)
-	// Використовуємо спеціальний сигнал shrinkAmount: -1.0, щоб шейдер зрозумів, що потрібно виправити колір.
+	// Шар 1: Основний розмитий фон (з виправленим кольором)
 	drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
 
-	// 4. Якщо потрібно, накладаємо верхній шар
 	if (showOriginalOnTop) {
 		gl.enable(gl.BLEND);
-		// НОВИЙ БЛЕНДІНГ: Для попередньо помноженої альфи
+		// Використовуємо спеціальний блендінг для " світіння"
+		gl.blendFunc(gl.ONE, gl.ONE);
+
+		// Шар 2: "Аура" - використовуємо сигнал shrinkBlur: -1.0 для копіювання
+		drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
+
 		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-		drawPass(programFinal, originalTexture, {
-			shrinkAmount: shrinkAmount,
-			shrinkBlur: shrinkBlur,
-			texelSize: [1 / imgW, 1 / imgH]
-		});
+
+		// Шар 3: Чіткий результат ерозії - теж використовуємо сигнал
+		drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
+
 		gl.disable(gl.BLEND);
 	}
 
-	// --- Відображення на екрані (нова логіка з зумом і панорамуванням) ---
+	// --- ЕТАП 4: Відображення на екрані ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
-	// Розраховуємо розміри зображення з урахуванням зуму
-	const scaledW = Math.round(imageSize[0] * scale);
-	const scaledH = Math.round(imageSize[1] * scale);
+	const vpX = Math.round((gl.canvas.width / 2) - (imgW * scale / 2) + panX);
+	const vpY = Math.round((gl.canvas.height / 2) - (imgH * scale / 2) - panY);
+	gl.viewport(vpX, vpY, Math.round(imgW * scale), Math.round(imgH * scale));
 
-	// Розраховуємо позицію верхнього лівого кута
-	// Центруємо зображення, а потім застосовуємо панорамування
-	const centerX = gl.canvas.width / 2;
-	const centerY = gl.canvas.height / 2;
-	const vpX = Math.round(centerX - (scaledW / 2) + panX);
-	const vpY = Math.round(centerY - (scaledH / 2) - panY); // Y інвертований у viewport
-
-	gl.viewport(vpX, vpY, scaledW, scaledH);
-	drawPass(programFinal, outputFBO.texture, {});
+	drawPass(programFinal, outputFBO.texture, { shrinkBlur: -1.0 });
 }
 
 function setupResources() {
@@ -138,16 +157,21 @@ function setupResources() {
 	if (originalTexture) gl.deleteTexture(originalTexture);
 	originalTexture = createTexture(gl, currentImage);
 
+	// Видаляємо всі старі FBO, включаючи нові
 	if (fbo1) { gl.deleteFramebuffer(fbo1.fbo); gl.deleteTexture(fbo1.texture); }
 	if (fbo2) { gl.deleteFramebuffer(fbo2.fbo); gl.deleteTexture(fbo2.texture); }
 	if (outputFBO) { gl.deleteFramebuffer(outputFBO.fbo); gl.deleteTexture(outputFBO.texture); }
+	if (fboShrunk) { gl.deleteFramebuffer(fboShrunk.fbo); gl.deleteTexture(fboShrunk.texture); }
+	if (fboShrunkBlurred) { gl.deleteFramebuffer(fboShrunkBlurred.fbo); gl.deleteTexture(fboShrunkBlurred.texture); }
 
+	// Створюємо всі FBO з актуальним розміром
 	fbo1 = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	fbo2 = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	outputFBO = createFramebuffer(gl, imageSize[0], imageSize[1]);
-	if (document.readyState === 'complete') {
-		render();
-	}
+	fboShrunk = createFramebuffer(gl, imageSize[0], imageSize[1]);
+	fboShrunkBlurred = createFramebuffer(gl, imageSize[0], imageSize[1]);
+
+	render();
 }
 
 function handleImageUpload(event) {
