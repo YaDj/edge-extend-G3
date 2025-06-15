@@ -26,6 +26,12 @@ let originalFileName = 'image';
 let shrinkAmount = 1.0;
 let shrinkBlur = 0.0;
 let showOriginalOnTop = true;
+let scale = 1.0;
+let panX = 0.0;
+let panY = 0.0;
+let isPanning = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
 
 // --- Оголошення ВСІХ функцій-помічників ---
 
@@ -106,18 +112,23 @@ function render() {
 		gl.disable(gl.BLEND);
 	}
 
-	// --- Відображення на екрані ---
+	// --- Відображення на екрані (нова логіка з зумом і панорамуванням) ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
-	const canvasAspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-	const imgAspect = imgW / imgH;
-	let vpW, vpH, vpX, vpY;
-	if (imgAspect > canvasAspect) { vpW = gl.canvas.width; vpH = Math.round(vpW / imgAspect); vpX = 0; vpY = Math.round((gl.canvas.height - vpH) / 2); }
-	else { vpH = gl.canvas.height; vpW = Math.round(vpH * imgAspect); vpY = 0; vpX = Math.round((gl.canvas.width - vpW) / 2); }
-	gl.viewport(vpX, vpY, vpW, vpH);
 
-	// Просто малюємо готовий результат з outputFBO, без додаткових ефектів
+	// Розраховуємо розміри зображення з урахуванням зуму
+	const scaledW = Math.round(imageSize[0] * scale);
+	const scaledH = Math.round(imageSize[1] * scale);
+
+	// Розраховуємо позицію верхнього лівого кута
+	// Центруємо зображення, а потім застосовуємо панорамування
+	const centerX = gl.canvas.width / 2;
+	const centerY = gl.canvas.height / 2;
+	const vpX = Math.round(centerX - (scaledW / 2) + panX);
+	const vpY = Math.round(centerY - (scaledH / 2) - panY); // Y інвертований у viewport
+
+	gl.viewport(vpX, vpY, scaledW, scaledH);
 	drawPass(programFinal, outputFBO.texture, {});
 }
 
@@ -237,10 +248,70 @@ async function main() {
 
 	window.addEventListener('resize', () => { resizeCanvasToDisplaySize(); render(); });
 
+	// --- НОВІ ОБРОБНИКИ ---
+	canvas.addEventListener('wheel', handleWheel);
+	canvas.addEventListener('mousedown', handleMouseDown);
+	window.addEventListener('mousemove', handleMouseMove); // слухаємо на window, щоб не втрачати фокус
+	window.addEventListener('mouseup', handleMouseUp);
+	canvas.addEventListener('dblclick', handleDoubleClick);
+	canvas.style.cursor = 'grab'; // Встановлюємо початковий курсор
+
 	const defaultImg = new Image();
 	defaultImg.onload = () => { currentImage = defaultImg; setupResources(); };
 	defaultImg.onerror = () => console.warn("Default image 'image.png' not found.");
 	defaultImg.src = 'image.png';
+}
+
+// --- ОБРОБНИКИ ПОДІЙ ДЛЯ ЗУМУ ТА ПАНОРАМУВАННЯ ---
+function handleWheel(event) {
+	event.preventDefault();
+	const zoomSpeed = 0.1;
+	const delta = event.deltaY > 0 ? -1 : 1;
+	const oldScale = scale;
+
+	scale *= (1 + delta * zoomSpeed);
+	scale = Math.max(0.1, Math.min(scale, 30)); // Обмежуємо зум
+
+	// Зум до курсору (важливо для хорошого UX)
+	const rect = canvas.getBoundingClientRect();
+	const mouseX = event.clientX - rect.left;
+	const mouseY = event.clientY - rect.top;
+
+	panX = mouseX - (mouseX - panX) * (scale / oldScale);
+	panY = mouseY - (mouseY - panY) * (scale / oldScale);
+
+	render();
+}
+
+function handleMouseDown(event) {
+	isPanning = true;
+	lastMouseX = event.clientX;
+	lastMouseY = event.clientY;
+	canvas.style.cursor = 'grabbing';
+}
+
+function handleMouseMove(event) {
+	if (!isPanning) return;
+	const dx = event.clientX - lastMouseX;
+	const dy = event.clientY - lastMouseY;
+	panX += dx;
+	panY += dy;
+	lastMouseX = event.clientX;
+	lastMouseY = event.clientY;
+	render();
+}
+
+function handleMouseUp() {
+	isPanning = false;
+	canvas.style.cursor = 'grab';
+}
+
+function handleDoubleClick() {
+	// Скидаємо зум і позицію
+	scale = 1.0;
+	panX = 0.0;
+	panY = 0.0;
+	render();
 }
 
 // --- Запуск програми ---
