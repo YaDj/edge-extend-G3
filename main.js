@@ -125,15 +125,13 @@ function render() {
 
 	if (showOriginalOnTop) {
 		gl.enable(gl.BLEND);
-		// Використовуємо спеціальний блендінг для " світіння"
-		gl.blendFunc(gl.ONE, gl.ONE);
-
-		// Шар 2: "Аура" - використовуємо сигнал shrinkBlur: -1.0 для копіювання
-		drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
-
+		// Встановлюємо ПРАВИЛЬНИЙ блендінг ОДИН РАЗ для обох шарів
 		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-		// Шар 3: Чіткий результат ерозії - теж використовуємо сигнал
+		// Шар 2: "Аура" - накладаємо на фон
+		drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
+
+		// Шар 3: Чіткий результат ерозії - накладаємо на фон + ауру
 		drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
 
 		gl.disable(gl.BLEND);
