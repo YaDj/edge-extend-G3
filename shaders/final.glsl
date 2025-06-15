@@ -49,13 +49,9 @@ void main() {
     }
   }
 
-    // КРОК 2: КОНТРОЛЬ ЖОРСТКОСТІ КРАЮ. Використовуємо u_shrinkBlur.
-    // Перетворюємо лінійне значення minAlpha на криву за допомогою smoothstep.
-    // u_shrinkBlur контролює "ширину" цього переходу.
-    float hardness = 0.5 - (u_shrinkBlur * 0.1); // Чим більший blur, тим м'якший край
-    hardness = max(0.0, hardness); // Захист від від'ємних значень
-
-    float smoothedAlpha = smoothstep(hardness, 0.5, minAlpha);
+    // КРОК 2: КОНТРОЛЬ ЖОРСТКОСТІ КРАЮ.
+	float softness_power = 1.0 + u_shrinkBlur * 3.0;
+	float smoothedAlpha = pow(minAlpha, softness_power);
     
     // Завжди беремо мінімум між оригінальною альфою і результатом ерозії,
     // щоб ефект не "виходив" за межі оригінального зображення.
