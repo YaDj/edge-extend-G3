@@ -263,9 +263,9 @@ async function main() {
 }
 
 // --- ОБРОБНИКИ ПОДІЙ ДЛЯ ЗУМУ ТА ПАНОРАМУВАННЯ ---
-// Нова версія handleWheel для зуму з центру
+
 function handleWheel(event) {
-	event.preventDefault(); // Залишаємо, щоб сторінка не прокручувалася
+	event.preventDefault();
 
 	const zoomSpeed = 0.1;
 	const delta = event.deltaY > 0 ? -1 : 1;
