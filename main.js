@@ -127,10 +127,8 @@ function render() {
 		gl.enable(gl.BLEND);
 		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-		// Шар 2: "Аура". Використовуємо НОВИЙ сигнал -2.0
-		// Ми розмиваємо шар з ерозією, тому передаємо його в u_image.
-		// Але нам потрібно виправити його колір, зберігши альфу.
-		drawPass(programFinal, fboShrunkBlurred.texture, { shrinkAmount: -2.0 });
+		// Шар 2: "Аура". Просто копіюємо готову текстуру.
+		drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
 
 		// ТИМЧАСОВО ВИМКНЕНО
 		// Шар 3: Чіткий результат ерозії
