@@ -263,22 +263,16 @@ async function main() {
 }
 
 // --- ОБРОБНИКИ ПОДІЙ ДЛЯ ЗУМУ ТА ПАНОРАМУВАННЯ ---
+// Нова версія handleWheel для зуму з центру
 function handleWheel(event) {
-	event.preventDefault();
+	event.preventDefault(); // Залишаємо, щоб сторінка не прокручувалася
+
 	const zoomSpeed = 0.1;
 	const delta = event.deltaY > 0 ? -1 : 1;
-	const oldScale = scale;
 
+	// Просто змінюємо масштаб. Не чіпаємо panX і panY.
 	scale *= (1 + delta * zoomSpeed);
 	scale = Math.max(0.1, Math.min(scale, 30)); // Обмежуємо зум
-
-	// Зум до курсору (важливо для хорошого UX)
-	const rect = canvas.getBoundingClientRect();
-	const mouseX = event.clientX - rect.left;
-	const mouseY = event.clientY - rect.top;
-
-	panX = mouseX - (mouseX - panX) * (scale / oldScale);
-	panY = mouseY - (mouseY - panY) * (scale / oldScale);
 
 	render();
 }
