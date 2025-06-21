@@ -151,28 +151,31 @@ function render() {
 		gl.disable(gl.BLEND);
 
 	} else {
-		// СТАНДАРТНИЙ РЕЖИМ (debugPass === 0)
+		// Стандартний режим (Композитинг)
 		console.log("DEBUG: Showing Final Composite");
 		// Спочатку створюємо фінальну композицію в outputFBO
 		gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
 		gl.viewport(0, 0, imgW, imgH);
-		gl.clearColor(0, 0, 0, 0);
+		gl.clearColor(0, 0, 0, 1.0); // <-- Повернемо непрозорий чорний
 		gl.clear(gl.COLOR_BUFFER_BIT);
-		// Малюємо фон, виправляючи колір, але зберігаючи альфу
-		drawPass(programFinal, fbo2.texture, { shrinkAmount: -2.0 });
+
+		// Малюємо фон, роблячи його НЕПРОЗОРИМ
+		drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
+
 		if (showOriginalOnTop) {
 			gl.enable(gl.BLEND);
 			gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 			drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
-			// 3-й шар все ще вимкнено
-			// Шар 3: Чіткий результат ерозії
-			// drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
-
+			// РОЗКОМЕНТУЄМО 3-Й ШАР
+			drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
 			gl.disable(gl.BLEND);
 		}
 		// Тепер малюємо результат з outputFBO на екран
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-		gl.viewport(vpX, vpY, Math.round(imgW * scale), Math.round(imgH * scale));
+		gl.viewport(vpX, vpY, vpW, vpH); // Відновлюємо viewport для екрану
+		textureToDraw = outputFBO.texture;
+		uniformsToDraw = { shrinkBlur: -1.0 }; // Просто копіюємо
+		enableBlend = false; // Малюємо як непрозорий
 		drawPass(programFinal, outputFBO.texture, { shrinkBlur: -1.0 });
 	}
 }
