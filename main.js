@@ -82,7 +82,7 @@ function render() {
 	drawFullScreenQuad();
 	gl.disable(gl.BLEND);
 
-	// Етап 1: Розмиття фону -> fbo2
+	// Етап 1: Рендер розмитого фону -> fbo2
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	drawPass(programBlur, originalTexture, { radius, texelSize, direction: [1, 0] });
@@ -90,15 +90,17 @@ function render() {
 	gl.viewport(0, 0, imgW, imgH);
 	drawPass(programBlur, fbo1.texture, { radius, texelSize, direction: [0, 1] });
 
-	// Етап 2: Створення шарів ерозії
+	// Етап 2: Створення шарів ерозії, якщо потрібно
 	if (showOriginalOnTop) {
+		// 2a: Створюємо чіткий шар ерозії -> fboShrunk
 		gl.bindFramebuffer(gl.FRAMEBUFFER, fboShrunk.fbo);
 		gl.viewport(0, 0, imgW, imgH);
 		gl.clearColor(0, 0, 0, 0);
 		gl.clear(gl.COLOR_BUFFER_BIT);
 		drawPass(programFinal, originalTexture, { shrinkAmount, shrinkBlur: shrinkBlurValue, texelSize });
 
-		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo); // Використовуємо fbo1 як тимчасовий
+		// 2b: Розмиваємо результат ерозії ("аура") -> fboShrunkBlurred
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 		gl.viewport(0, 0, imgW, imgH);
 		drawPass(programBlur, fboShrunk.texture, { radius: shrinkBlurValue, texelSize, direction: [1, 0] });
 		gl.bindFramebuffer(gl.FRAMEBUFFER, fboShrunkBlurred.fbo);
@@ -106,37 +108,30 @@ function render() {
 		drawPass(programBlur, fbo1.texture, { radius: shrinkBlurValue, texelSize, direction: [0, 1] });
 	}
 
-	// Етап 3: Фінальний композитинг
+	// Етап 3: Фінальний композитинг в outputFBO
 	gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	gl.clearColor(0, 0, 0, 0); // Очищуємо до ПРОЗОРОГО чорного
+	gl.clearColor(0, 0, 0, 1); // ЗАВЖДИ очищуємо до непрозорого чорного
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
-	if (showOriginalOnTop) {
-		// Малюємо всі 3 шари
-		// Шар 1: Фон (виправлений колір, але прозорий)
-		drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
+	// Шар 1: ЗАВЖДИ малюємо фон, роблячи його НЕПРОЗОРИМ
+	drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
 
+	// Якщо потрібно, накладаємо верхні шари
+	if (showOriginalOnTop) {
 		gl.enable(gl.BLEND);
 		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-		// Шар 2: Аура (просто копіюємо, бо вона вже premultiplied)
+		// Шар 2: Аура (просто копіюємо)
 		drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
 
-		// ТИМЧАСОВО ВИМКНЕНО ДЛЯ ДЕБАГУ
-		// Шар 3: Чіткий край (теж просто копіюємо)
-		// drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
+		// Шар 3: Чіткий край (просто копіюємо)
+		drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
 
 		gl.disable(gl.BLEND);
-
-	} else {
-		// Малюємо тільки фон, але робимо його непрозорим для збереження в JPG
-		drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
-		// ...але це теж не зовсім вірно, треба подумати. Поки що залишимо так.
-		// Краще виправити це в saveAsJPG
 	}
 
-	// --- ЕТАП 4: Відображення на екрані ---
+	// Етап 4: Відображення на екрані
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -145,6 +140,7 @@ function render() {
 	const vpY = Math.round((gl.canvas.height / 2) - (imgH * scale / 2) - panY);
 	gl.viewport(vpX, vpY, Math.round(imgW * scale), Math.round(imgH * scale));
 
+	// Просто копіюємо фінальний, непрозорий результат з outputFBO
 	drawPass(programFinal, outputFBO.texture, { shrinkBlur: -1.0 });
 }
 
