@@ -172,9 +172,16 @@ function render() {
 			gl.clearColor(0, 0, 0, 0);
 			gl.clear(gl.COLOR_BUFFER_BIT);
 
-			// Шар 1: Малюємо фон, але зберігаємо його прозорість
+			// --- НОВА, ПРАВИЛЬНА ЛОГІКА ---
+			// 1. Спочатку виправляємо колір фону і зберігаємо його в тимчасовий fbo1
+			gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 			drawPass(programFinal, fbo2.texture, { shrinkAmount: -2.0 });
 
+			// 2. Тепер малюємо цей виправлений фон в outputFBO, одразу конвертуючи його в premultiplied alpha
+			gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
+			drawPass(programFinal, fbo1.texture, { shrinkAmount: 0, shrinkBlur: 0 });
+
+			// 3. Тепер всі шари в одному форматі, і блендінг спрацює
 			if (showOriginalOnTop) {
 				gl.enable(gl.BLEND);
 				gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -184,6 +191,7 @@ function render() {
 				drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
 				gl.disable(gl.BLEND);
 			}
+
 			// Налаштовуємо, щоб на екран малювався результат з outputFBO
 			textureToDraw = outputFBO.texture;
 			uniformsToDraw = { shrinkBlur: -1.0 };
