@@ -135,6 +135,35 @@ function render() {
 				enableBlend = true;
 			}
 			break;
+		case 4: // ДЕБАГ: Бленд тільки Шару 2 і Шару 3
+			if (showOriginalOnTop) {
+				console.log("DEBUG: Showing Layer 2 + Layer 3 blend");
+
+				// Малюємо в наш проміжний буфер, щоб отримати результат їх змішування
+				gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
+				gl.viewport(0, 0, imgW, imgH);
+				gl.clearColor(0, 0, 0, 0); // Починаємо з чистого прозорого листа
+				gl.clear(gl.COLOR_BUFFER_BIT);
+
+				// Вмикаємо блендінг
+				gl.enable(gl.BLEND);
+				gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+				// Малюємо Шар 2 ("Аура")
+				drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
+
+				// Поверх нього малюємо Шар 3 (Чіткий край)
+				drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
+
+				gl.disable(gl.BLEND);
+
+				// Тепер налаштовуємо вивід цього результату на екран
+				textureToDraw = outputFBO.texture;
+				uniformsToDraw = { shrinkBlur: -1.0 }; // Просто копіюємо
+				enableBlend = true; // Результат прозорий, тому потрібен блендінг з фоном екрану
+			}
+			break;
+
 		default: // Стандартний режим
 			// Створюємо фінальну композицію в outputFBO
 			gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
@@ -325,6 +354,7 @@ async function main() {
 			case '1': debugPass = 1; break; // Показати фон
 			case '2': debugPass = 2; break; // Показати "ауру"
 			case '3': debugPass = 3; break; // Показати чіткий шар
+			case '4': debugPass = 4; break;
 			default: return; // Ігнорувати інші клавіші
 		}
 		event.preventDefault();
