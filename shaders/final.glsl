@@ -9,32 +9,25 @@ uniform vec2 u_texelSize;
 uniform float u_shrinkAmount;
 uniform float u_shrinkBlur;
 
-// Функція №1: Для фону. Робить колір непрозорим.
-vec4 fixColorAndMakeOpaque(vec4 color) {
-    if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 1.0); } // Непрозорий чорний
-    return vec4(color.rgb / color.a, 1.0); // Непрозорий колір
-}
-
-// Функція №2: Для верхніх шарів. Зберігає прозорість.
+// ЗАЛИШАЄМО ТІЛЬКИ ОДНУ, ПРАВИЛЬНУ ФУНКЦІЮ
 vec4 fixColorAndKeepAlpha(vec4 color) {
-    if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 0.0); } // Прозорий чорний
-    return vec4(color.rgb / color.a, color.a); // Колір + оригінальна альфа
+    if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 0.0); } // Прозорий
+    return vec4(color.rgb / color.a, color.a); // Виправлений колір + оригінальна альфа
 }
 
 void main() {
   vec4 baseColor = texture(u_image, v_uv);
 
     // --- КЕРУВАННЯ РЕЖИМАМИ ---
-    // Сигнал -1.0: Виправити колір і зробити непрозорим (для фону)
+    // Сигнал -1.0: Виправити колір, зберігши альфу
   if (u_shrinkAmount < -0.5) { 
-        outColor = fixColorAndMakeOpaque(baseColor);
-        return;
-    }
-    // Сигнал -2.0: Виправити колір, але зберегти альфу (для аури)
-    if (u_shrinkAmount < -1.5) {
         outColor = fixColorAndKeepAlpha(baseColor);
     return;
   }
+
+    // Сигнал -2.0 більше не потрібен
+
+    // Шлях для простого копіювання
 	if (u_shrinkBlur < -0.5) {
 		outColor = baseColor;
 		return;
