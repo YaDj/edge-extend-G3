@@ -111,19 +111,7 @@ function render() {
 
 	// --- Етап 3: Відображення на екран ---
 
-	// 3a. Очищуємо головний канвас (екран) і встановлюємо viewport
-	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-	gl.clearColor(0.2, 0.2, 0.2, 1.0);
-	gl.clear(gl.COLOR_BUFFER_BIT);
-
-	// Встановлюємо viewport для правильних пропорцій
-	const vpX = Math.round((gl.canvas.width / 2) - (imgW * scale / 2) + panX);
-	const vpY = Math.round((gl.canvas.height / 2) - (imgH * scale / 2) - panY);
-	const vpW = Math.round(imgW * scale);
-	const vpH = Math.round(imgH * scale);
-	gl.viewport(vpX, vpY, vpW, vpH);
-
-	// 3b. Визначаємо, що саме малювати
+	// 3a. Визначаємо, що саме малювати
 	let textureToDraw;
 	let uniformsToDraw = {};
 	let enableBlend = false;
@@ -164,11 +152,25 @@ function render() {
 			// Налаштовуємо, щоб на екран малювався результат з outputFBO
 			textureToDraw = outputFBO.texture;
 			uniformsToDraw = { shrinkBlur: -1.0 };
-			enableBlend = false; // Малюємо як непрозорий
+			enableBlend = false;
 			break;
 	}
 
-	// 3c. Виконуємо фінальний малюнок на екран
+	// 3b. Виконуємо фінальний малюнок на екран
+
+	// --- ОСНОВНЕ ВИПРАВЛЕННЯ ---
+	// ЗАВЖДИ переконуємось, що ми малюємо на екран (null), а не в останній активний FBO.
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+	gl.clearColor(0.2, 0.2, 0.2, 1.0);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+
+	const vpX = Math.round((gl.canvas.width / 2) - (imgW * scale / 2) + panX);
+	const vpY = Math.round((gl.canvas.height / 2) - (imgH * scale / 2) - panY);
+	const vpW = Math.round(imgW * scale);
+	const vpH = Math.round(imgH * scale);
+	gl.viewport(vpX, vpY, vpW, vpH);
+
 	if (textureToDraw) {
 		if (enableBlend) {
 			gl.enable(gl.BLEND);
