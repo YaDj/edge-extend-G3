@@ -122,11 +122,12 @@ function render() {
 		gl.enable(gl.BLEND);
 		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-		// Шар 2: Аура (просто копіюємо)
-		drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
+		// Шар 2: "Аура"
+		drawPass(programFinal, fboShrunkBlurred.texture, { shrinkAmount: -2.0 });
 
-		// Шар 3: Чіткий край (просто копіюємо)
-		drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
+		// ТИМЧАСОВО ВИМКНЕНО
+		// Шар 3: Чіткий результат ерозії
+		// drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
 
 		gl.disable(gl.BLEND);
 	}
