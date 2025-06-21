@@ -139,20 +139,27 @@ function render() {
 			// Створюємо фінальну композицію в outputFBO
 			gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
 			gl.viewport(0, 0, imgW, imgH);
-			gl.clearColor(0, 0, 0, 1.0);
+			// Очищуємо до ПРОЗОРОГО чорного, щоб було з чим змішувати
+			gl.clearColor(0, 0, 0, 0);
 			gl.clear(gl.COLOR_BUFFER_BIT);
-			drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
+
+			// Шар 1: Малюємо фон, але зберігаємо його прозорість
+			drawPass(programFinal, fbo2.texture, { shrinkAmount: -2.0 });
+
 			if (showOriginalOnTop) {
 				gl.enable(gl.BLEND);
 				gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+				// Шар 2: Аура
 				drawPass(programFinal, fboShrunkBlurred.texture, { shrinkBlur: -1.0 });
+				// Шар 3: Чіткий край
 				drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
 				gl.disable(gl.BLEND);
 			}
 			// Налаштовуємо, щоб на екран малювався результат з outputFBO
 			textureToDraw = outputFBO.texture;
 			uniformsToDraw = { shrinkBlur: -1.0 };
-			enableBlend = false;
+			// Малюємо на екран, який має свій чорний фон, тому прозорість буде виглядати правильно.
+			enableBlend = true;
 			break;
 	}
 
