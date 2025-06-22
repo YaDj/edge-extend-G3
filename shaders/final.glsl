@@ -9,38 +9,44 @@ uniform vec2 u_texelSize;
 uniform float u_shrinkAmount;
 uniform float u_shrinkBlur;
 
-// Функція №1: Для непрозорого фону (використовується в дебаг-режимі 1)
+// Функція №1: Для фону. Робить колір непрозорим.
 vec4 fixColorAndMakeOpaque(vec4 color) {
-    if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 1.0); }
-    return vec4(color.rgb / color.a, 1.0);
+    if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 1.0); } // Непрозорий чорний
+    return vec4(color.rgb / color.a, 1.0); // Непрозорий колір
 }
 
-// Функція №2: Для прозорих шарів (використовується для композитингу)
+// Функція №2: Для верхніх шарів. Зберігає прозорість.
 vec4 fixColorAndKeepAlpha(vec4 color) {
-    if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 0.0); }
-    return vec4(color.rgb / color.a, color.a);
+    if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 0.0); } // Прозорий чорний
+    return vec4(color.rgb / color.a, color.a); // Колір + оригінальна альфа
 }
 
 void main() {
   vec4 baseColor = texture(u_image, v_uv);
 
     // --- КЕРУВАННЯ РЕЖИМАМИ ---
-    if (u_shrinkAmount < -1.5) { // Сигнал -2.0: Виправити колір, ЗБЕРІГШИ альфу
-        outColor = fixColorAndKeepAlpha(baseColor);
-        return;
-    }
-    if (u_shrinkAmount < -0.5) { // Сигнал -1.0: Виправити колір і зробити НЕПРОЗОРИМ
+    // Сигнал -1.0: Виправити колір і зробити непрозорим (для фону)
+  if (u_shrinkAmount < -0.5) { 
         outColor = fixColorAndMakeOpaque(baseColor);
     return;
   }
+    // Сигнал -2.0: Виправити колір, але зберегти альфу (для аури)
+    if (u_shrinkAmount < -1.5) {
+        outColor = fixColorAndKeepAlpha(baseColor);
+        return;
+    }
 
-    // --- Логіка "SOFT EROSION" ---
+    // Новий шлях для простого копіювання
+	if (u_shrinkBlur < -0.5) {
+		outColor = baseColor;
+		return;
+	}
+
+    // --- Логіка ерозії (залишається без змін) ---
 	if (u_shrinkBlur <= 0.0 && u_shrinkAmount <= 0.0) {
 	outColor = vec4(baseColor.rgb * baseColor.a, baseColor.a);
 	return;
 	}
-
-    // КРОК 1: ЕРОЗІЯ. Знаходимо мінімальну альфу в радіусі u_shrinkAmount.
     float minAlpha = 1.0;
     int kernelRadius = int(ceil(u_shrinkAmount));
     if (kernelRadius > 0) {
@@ -54,17 +60,8 @@ void main() {
     } else {
         minAlpha = baseColor.a;
   }
-
-    // КРОК 2: ПОМ'ЯКШЕННЯ КРАЮ.
-    // u_shrinkAmount контролює поріг, u_shrinkBlur - ширину переходу.
-    float threshold = 1.0 - (u_shrinkAmount * 0.1);
-    float softness = u_shrinkBlur * 0.5;
-    
-    float smoothedAlpha = smoothstep(threshold - softness, threshold + softness, minAlpha);
-    
-    // Застосовуємо фінальну альфу
+    float softness_power = 1.0 + u_shrinkBlur;
+	float smoothedAlpha = pow(minAlpha, softness_power);
   float finalAlpha = min(baseColor.a, smoothedAlpha);
-    
-    // Конвертуємо в premultiplied alpha для коректного блендінгу
 outColor = vec4(baseColor.rgb * finalAlpha, finalAlpha);
 }
