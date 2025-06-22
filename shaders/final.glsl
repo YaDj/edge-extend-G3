@@ -9,24 +9,32 @@ uniform vec2 u_texelSize;
 uniform float u_shrinkAmount;
 uniform float u_shrinkBlur;
 
-// Функція для фону. Робить колір НЕПРОЗОРИМ.
+// Функція №1: Для непрозорого фону (використовується в дебаг-режимі 1)
 vec4 fixColorAndMakeOpaque(vec4 color) {
     if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 1.0); }
     return vec4(color.rgb / color.a, 1.0);
 }
 
+// Функція №2: Для прозорих шарів (використовується для композитингу)
+vec4 fixColorAndKeepAlpha(vec4 color) {
+    if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 0.0); }
+    return vec4(color.rgb / color.a, color.a);
+}
+
 void main() {
   vec4 baseColor = texture(u_image, v_uv);
 
-    // --- Шлях 1: Рендер РОЗМИТОГО ФОНУ ---
-  if (u_shrinkAmount < -0.5) { 
+    // --- КЕРУВАННЯ РЕЖИМАМИ ---
+    if (u_shrinkAmount < -1.5) { // Сигнал -2.0: Виправити колір, ЗБЕРІГШИ альфу
+        outColor = fixColorAndKeepAlpha(baseColor);
+        return;
+    }
+    if (u_shrinkAmount < -0.5) { // Сигнал -1.0: Виправити колір і зробити НЕПРОЗОРИМ
         outColor = fixColorAndMakeOpaque(baseColor);
     return;
   }
 
-    // --- Шлях 2: Рендер ВЕРХНЬОГО ШАРУ з ефектом "SOFT EROSION" ---
-    
-    // Якщо ефекти вимкнені, просто конвертуємо в premultiplied alpha
+    // --- Логіка "SOFT EROSION" ---
 	if (u_shrinkBlur <= 0.0 && u_shrinkAmount <= 0.0) {
 	outColor = vec4(baseColor.rgb * baseColor.a, baseColor.a);
 	return;

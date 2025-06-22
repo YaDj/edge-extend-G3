@@ -83,17 +83,13 @@ function render() {
 	drawFullScreenQuad();
 	gl.disable(gl.BLEND);
 
-	// --- ЕТАП 1: Генеруємо всі необхідні шари ---
-
-	// 1a: Розмитий фон -> fbo2
+	// Етап 1: Генеруємо всі необхідні шари
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	drawPass(programBlur, originalTexture, { radius, texelSize, direction: [1, 0] });
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	drawPass(programBlur, fbo1.texture, { radius, texelSize, direction: [0, 1] });
-
-	// 1b: Верхній шар з ефектом "Soft Erosion" -> fboShrunk
 	if (showOriginalOnTop) {
 		gl.bindFramebuffer(gl.FRAMEBUFFER, fboShrunk.fbo);
 		gl.viewport(0, 0, imgW, imgH);
@@ -102,27 +98,25 @@ function render() {
 		drawPass(programFinal, originalTexture, { shrinkAmount, shrinkBlur: shrinkBlurValue, texelSize });
 	}
 
-	// --- ЕТАП 2: Фінальний композитинг і відображення ---
-
+	// Етап 2: Фінальний композитинг і відображення
 	let textureToDraw;
 	let uniformsToDraw = {};
 
-	// Визначаємо, що саме малювати
-	if (debugPass === 1) { // Показати фон
+	if (debugPass === 1) {
 		textureToDraw = fbo2.texture;
 		uniformsToDraw = { shrinkAmount: -1.0 };
-	} else if (debugPass === 2 && showOriginalOnTop) { // Показати верхній шар
+	} else if (debugPass === 2 && showOriginalOnTop) {
 		textureToDraw = fboShrunk.texture;
 		uniformsToDraw = {};
 	} else { // Стандартний режим
-		// Створюємо композицію в outputFBO
+		// Створюємо композицію в outputFBO, починаючи з прозорого фону
 		gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
 		gl.viewport(0, 0, imgW, imgH);
-		gl.clearColor(0, 0, 0, 1.0);
+		gl.clearColor(0, 0, 0, 0); // ОЧИЩУЄМО ДО ПРОЗОРОГО
 		gl.clear(gl.COLOR_BUFFER_BIT);
 
-		// Шар 1: Фон (непрозорий)
-		drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
+		// Шар 1: Фон (виправлений колір, АЛЕ ПРОЗОРИЙ)
+		drawPass(programFinal, fbo2.texture, { shrinkAmount: -2.0 });
 
 		// Шар 2: Верхній шар
 		if (showOriginalOnTop) {
@@ -132,7 +126,6 @@ function render() {
 			gl.disable(gl.BLEND);
 		}
 		textureToDraw = outputFBO.texture;
-		uniformsToDraw = {};
 	}
 
 	// Малюємо фінальний результат на екран
@@ -144,7 +137,7 @@ function render() {
 	const vpY = Math.round((gl.canvas.height / 2) - (imgH * scale / 2) - panY);
 	gl.viewport(vpX, vpY, Math.round(imgW * scale), Math.round(imgH * scale));
 
-	// Верхній шар вже прозорий, тому завжди потрібен блендінг з фоном екрану
+	// Фінальний результат сам по собі прозорий, тому завжди потрібен блендінг
 	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 	drawPass(programFinal, textureToDraw, uniformsToDraw);
