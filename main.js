@@ -18,7 +18,7 @@ const blendCheckbox = document.getElementById('blendCheckbox');
 
 // --- Глобальні змінні ---
 let programBlur, programFinal;
-let originalTexture, fbo1, fbo2, outputFBO, fboShrunk, fboShrunkBlurred;
+let originalTexture, fbo1, fbo2, outputFBO, fboShrunk;
 let quadBuffer;
 let imageSize = [0, 0];
 let currentImage = null;
@@ -100,13 +100,6 @@ function render() {
 		gl.clear(gl.COLOR_BUFFER_BIT);
 		drawPass(programFinal, originalTexture, { shrinkAmount, shrinkBlur: shrinkBlurValue, texelSize });
 
-		// 2b: Розмиваємо результат ерозії ("аура") -> fboShrunkBlurred
-		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
-		gl.viewport(0, 0, imgW, imgH);
-		drawPass(programBlur, fboShrunk.texture, { radius: shrinkBlurValue, texelSize, direction: [1, 0] });
-		gl.bindFramebuffer(gl.FRAMEBUFFER, fboShrunkBlurred.fbo);
-		gl.viewport(0, 0, imgW, imgH);
-		drawPass(programBlur, fbo1.texture, { radius: shrinkBlurValue, texelSize, direction: [0, 1] });
 	}
 
 	// --- Етап 3: Відображення на екран ---
@@ -202,14 +195,12 @@ function setupResources() {
 	if (fbo2) { gl.deleteFramebuffer(fbo2.fbo); gl.deleteTexture(fbo2.texture); }
 	if (outputFBO) { gl.deleteFramebuffer(outputFBO.fbo); gl.deleteTexture(outputFBO.texture); }
 	if (fboShrunk) { gl.deleteFramebuffer(fboShrunk.fbo); gl.deleteTexture(fboShrunk.texture); }
-	if (fboShrunkBlurred) { gl.deleteFramebuffer(fboShrunkBlurred.fbo); gl.deleteTexture(fboShrunkBlurred.texture); }
 
 	// Створюємо всі FBO з актуальним розміром
 	fbo1 = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	fbo2 = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	outputFBO = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	fboShrunk = createFramebuffer(gl, imageSize[0], imageSize[1]);
-	fboShrunkBlurred = createFramebuffer(gl, imageSize[0], imageSize[1]);
 
 	render();
 }
