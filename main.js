@@ -32,7 +32,7 @@ let panY = 0.0;
 let isPanning = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
-let debugPass = 0; // 0=Normal, 1=BG, 2=Aura, 3=Shrunk
+let debugPass = 0;
 
 // --- Оголошення ВСІХ функцій-помічників ---
 
@@ -74,16 +74,15 @@ function drawPass(program, inputTexture, uniforms = {}) {
 function render() {
 	if (!originalTexture) return;
 
+	// --- ЕТАП 1: ЗАВЖДИ генеруємо всі необхідні шари ---
 	const radius = parseFloat(radiusSlider.value);
 	const shrinkBlurValue = parseFloat(shrinkBlurSlider.value);
 	radiusLabel.textContent = radius.toFixed(1);
 	const [imgW, imgH] = imageSize;
 	const texelSize = [1 / imgW, 1 / imgH];
-
 	drawFullScreenQuad();
 	gl.disable(gl.BLEND);
 
-	// --- ЕТАП 1: Генеруємо всі необхідні шари ---
 	// 1a: Розмитий фон -> fbo2
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
@@ -101,52 +100,38 @@ function render() {
 		drawPass(programFinal, originalTexture, { shrinkAmount, shrinkBlur: shrinkBlurValue, texelSize });
 	}
 
-	// --- ЕТАП 2: Визначаємо, що саме малювати на екран ---
+	// --- ЕТАП 2: ЗАВЖДИ створюємо фінальну, НЕПРОЗОРУ композицію в outputFBO ---
+	gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
+	gl.viewport(0, 0, imgW, imgH);
+	gl.clearColor(0, 0, 0, 1.0); // Починаємо з непрозорого чорного
+	gl.clear(gl.COLOR_BUFFER_BIT);
+
+	// Малюємо Шар 1 (фон), роблячи його непрозорим. Це наша основа.
+	drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
+
+	// Якщо потрібно, накладаємо верхній шар
+	if (showOriginalOnTop) {
+		gl.enable(gl.BLEND);
+		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+		drawPass(programFinal, fboShrunk.texture, {});
+		gl.disable(gl.BLEND);
+	}
+	// Тепер outputFBO - це наше фінальне зображення, готове до всього.
+
+	// --- ЕТАП 3: Вирішуємо, що показати на екрані (відладка або фінал) ---
 	let textureToDraw;
-	let uniformsToDraw = {};
-	let enableBlend = false;
+	let enableBlendForScreen = false;
 
-	if (debugPass === 1) { // Показати фон (непрозорий)
+	if (debugPass === 1) { // Показати фон (він вже непрозорий)
 		textureToDraw = fbo2.texture;
-		uniformsToDraw = { shrinkAmount: -1.0 };
-		enableBlend = false;
-
-	} else if (debugPass === 2 && showOriginalOnTop) { // Показати верхній шар (напівпрозорий)
+	} else if (debugPass === 2 && showOriginalOnTop) { // Показати верхній шар (він напівпрозорий)
 		textureToDraw = fboShrunk.texture;
-		uniformsToDraw = {};
-		enableBlend = true;
-
-	} else { // Стандартний режим (debugPass === 0)
-		if (showOriginalOnTop) {
-			// Створюємо фінальну композицію в outputFBO
-			gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
-			gl.viewport(0, 0, imgW, imgH);
-			gl.clearColor(0, 0, 0, 0); // Починаємо з прозорого
-			gl.clear(gl.COLOR_BUFFER_BIT);
-
-			// Шар 1 (фон, напівпрозорий)
-			drawPass(programFinal, fbo2.texture, { shrinkAmount: -2.0 });
-
-			// Накладаємо Шар 2 (верхній шар)
-			gl.enable(gl.BLEND);
-			gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-			drawPass(programFinal, fboShrunk.texture, {});
-			gl.disable(gl.BLEND);
-
-			// Результат - це те, що в outputFBO
-			textureToDraw = outputFBO.texture;
-			enableBlend = true; // Результат напівпрозорий, тому змішуємо з фоном екрану
-			uniformsToDraw = {};
-
-		} else {
-			// Якщо галочка вимкнена, просто показуємо непрозорий фон
-			textureToDraw = fbo2.texture;
-			uniformsToDraw = { shrinkAmount: -1.0 };
-			enableBlend = false;
-		}
+		enableBlendForScreen = true;
+	} else { // Стандартний режим: показати фінальну композицію
+		textureToDraw = outputFBO.texture;
 	}
 
-	// --- ЕТАП 3: Малюємо фінальний результат на екран ---
+	// --- ЕТАП 4: Малюємо обрану текстуру на екран ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.clearColor(0.2, 0.2, 0.2, 1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -155,15 +140,18 @@ function render() {
 	const vpY = Math.round((gl.canvas.height / 2) - (imgH * scale / 2) - panY);
 	gl.viewport(vpX, vpY, Math.round(imgW * scale), Math.round(imgH * scale));
 
-	if (textureToDraw) {
-		if (enableBlend) {
-			gl.enable(gl.BLEND);
-			gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-		} else {
-			gl.disable(gl.BLEND);
-		}
-		drawPass(programFinal, textureToDraw, uniformsToDraw);
-		if (enableBlend) gl.disable(gl.BLEND);
+	if (enableBlendForScreen) {
+		gl.enable(gl.BLEND);
+		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+	} else {
+		gl.disable(gl.BLEND);
+	}
+
+	// `programFinal` тут використовується як простий копіювальник текстур
+	drawPass(programFinal, textureToDraw, {});
+
+	if (enableBlendForScreen) {
+		gl.disable(gl.BLEND);
 	}
 }
 
