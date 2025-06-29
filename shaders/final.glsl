@@ -39,7 +39,7 @@ void main() {
 	}
 
     // КРОК 1: ЕРОЗІЯ. Знаходимо мінімальну альфу в радіусі u_shrinkAmount.
-    // Це дає нам жорсткий край.
+    // Це створює жорсткий край.
     float minAlpha = 1.0;
     int kernelRadius = int(ceil(u_shrinkAmount));
     if (kernelRadius > 0) {
@@ -55,9 +55,10 @@ void main() {
   }
 
     // КРОК 2: ПОМ'ЯКШЕННЯ. Розмиваємо жорсткий край за допомогою u_shrinkBlur.
-    // Це фінальна, правильна формула.
-    float softness = 1.0 + u_shrinkBlur; // Чим більший блюр, тим більша м'якість
-    float smoothedAlpha = smoothstep(1.0 - softness, 1.0, minAlpha);
+    // Це фінальна, правильна формула, що симулює ефект "Blur після Erosion".
+    float softness = u_shrinkBlur * 0.1; // Коефіцієнт для чутливості повзунка
+    float threshold = 0.5;
+    float smoothedAlpha = smoothstep(threshold - softness, threshold + softness, minAlpha);
     
     // Застосовуємо фінальну альфу, не виходячи за межі оригіналу
   float finalAlpha = min(baseColor.a, smoothedAlpha);
