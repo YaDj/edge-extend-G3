@@ -4,35 +4,62 @@ precision highp float;
 in vec2 v_uv;
 out vec4 outColor;
 
+// Додаємо другий семплер для операцій з двома текстурами
 uniform sampler2D u_image;
+uniform sampler2D u_image2; 
+
 uniform vec2 u_texelSize;
 uniform float u_shrinkAmount;
 uniform float u_shrinkBlur;
 
-// Ця функція залишається для рендеру фону. Робить колір НЕПРОЗОРИМ.
-vec4 fixColorAndMakeOpaque(vec4 color) {
+// --- НАБІР НАШИХ ФУНКЦІЙ ---
+
+// Функція для непрозорого фону (стара)
+vec4 op_makeOpaqueBackground(vec4 color) {
     if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 1.0); }
     return vec4(color.rgb / color.a, 1.0);
 }
 
-void main() {
-  vec4 baseColor = texture(u_image, v_uv);
+// Функція для "Edge Extend" (ChannelBooleans Divide)
+vec4 op_edgeExtend(vec4 color) {
+    if (color.a < 0.001) { return vec4(0.0); }
+    return vec4(color.rgb / color.a, color.a);
+}
 
+void main() {
     // --- КЕРУВАННЯ РЕЖИМАМИ ---
-    // Сигнал для створення непрозорого фону
-  if (u_shrinkAmount < -0.5) { 
-        outColor = fixColorAndMakeOpaque(baseColor);
+    // u_shrinkAmount використовується як головний перемикач режиму
+    
+    // Режим -1.0: Створити непрозорий фон
+    if (u_shrinkAmount < -0.5 && u_shrinkAmount > -1.5) { 
+        outColor = op_makeOpaqueBackground(texture(u_image, v_uv));
     return;
   }
-    // Сигнал для простого копіювання текстури
-	if (u_shrinkBlur < -0.5) {
-		outColor = baseColor;
+
+    // Режим -2.0: Зробити "Edge Extend"
+    if (u_shrinkAmount < -1.5 && u_shrinkAmount > -2.5) {
+        outColor = op_edgeExtend(texture(u_image, v_uv));
 		return;
 	}
 
-    // --- ОСНОВНА ЛОГІКА: "SOFT EROSION" ---
+    // Режим -3.0: Створити "Hard Matte"
+    if (u_shrinkAmount < -2.5 && u_shrinkAmount > -3.5) {
+        float blurredAlpha = texture(u_image, v_uv).a;
+        float hardAlpha = smoothstep(0.99, 1.0, blurredAlpha);
+        outColor = vec4(vec3(hardAlpha), 1.0); // Записуємо маску в RGB
+        return;
+    }
+
+    // Режим -4.0: Скомбінувати колір з інвертованою маскою
+    if (u_shrinkAmount < -3.5 && u_shrinkAmount > -4.5) {
+        vec3 color = texture(u_image, v_uv).rgb;
+        float matteAlpha = texture(u_image2, v_uv).r; // Читаємо маску з червоного каналу
+        outColor = vec4(color, 1.0 - matteAlpha);
+        return;
+    }
     
-    // Якщо ефекти вимкнені, просто конвертуємо в premultiplied alpha
+    // --- Стандартна логіка для простого "Soft Erosion" (залишаємо для дебагу) ---
+    vec4 baseColor = texture(u_image, v_uv);
 	if (u_shrinkBlur <= 0.0 && u_shrinkAmount <= 0.0) {
 	outColor = vec4(baseColor.rgb * baseColor.a, baseColor.a);
 	return;

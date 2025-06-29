@@ -18,7 +18,7 @@ const blendCheckbox = document.getElementById('blendCheckbox');
 
 // --- Глобальні змінні ---
 let programBlur, programFinal;
-let originalTexture, fbo1, fbo2, outputFBO, fboShrunk;
+let originalTexture, fbo1, fbo2, outputFBO, fboShrunk, fboHardMatte, fboColorFill, fboSoftMatte;
 let quadBuffer;
 let imageSize = [0, 0];
 let currentImage = null;
@@ -68,6 +68,11 @@ function drawPass(program, inputTexture, uniforms = {}) {
 	if (uniforms.direction) gl.uniform2fv(gl.getUniformLocation(program, 'u_direction'), uniforms.direction);
 	if (uniforms.shrinkAmount !== undefined) gl.uniform1f(gl.getUniformLocation(program, 'u_shrinkAmount'), uniforms.shrinkAmount);
 	if (uniforms.shrinkBlur !== undefined) gl.uniform1f(gl.getUniformLocation(program, 'u_shrinkBlur'), uniforms.shrinkBlur);
+	if (uniforms.texture2) {
+		gl.activeTexture(gl.TEXTURE1); // Використовуємо інший текстурний слот
+		gl.bindTexture(gl.TEXTURE_2D, uniforms.texture2);
+		gl.uniform1i(gl.getUniformLocation(program, 'u_image2'), 1);
+	}
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
@@ -119,6 +124,52 @@ function render() {
 			if (showOriginalOnTop) {
 				textureToDraw = fboShrunk.texture;
 				uniformsToDraw = { shrinkBlur: -1.0 };
+				enableBlend = true;
+			}
+		case 5:
+			if (debugPass === 5) {
+				{ // Використовуємо блок {}, щоб уникнути конфлікту змінних
+					console.log("DEBUG: Running Fusion Comp");
+
+					// --- Крок 1: Blur1 (розмиття альфи оригіналу) -> fbo1 ---
+					// Ми розмиваємо всі канали, але будемо використовувати тільки альфу
+					drawPass(programBlur, originalTexture, { radius: 3.0, texelSize });
+
+					// --- Крок 2: MatteControl1 (створення жорсткої маски) -> fboHardMatte ---
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
+					drawPass(programFinal, fbo1.texture, { shrinkAmount: -3.0 });
+
+					// --- Крок 3: Blur2 + ChannelBooleans1 (створення кольорової заливки) -> fboColorFill ---
+					// Спочатку сильно розмиваємо fboHardMatte -> fbo1 (тимчасовий)
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
+					drawPass(programBlur, fboHardMatte.texture, { radius: 3.9, texelSize });
+					// Потім робимо "Edge Extend" -> fboColorFill
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo);
+					drawPass(programFinal, fbo1.texture, { shrinkAmount: -2.0 });
+
+					// --- Крок 4: Blur3 (створення м'якої маски) -> fboSoftMatte ---
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fboSoftMatte.fbo);
+					drawPass(programBlur, fboHardMatte.texture, { radius: 1.5, texelSize });
+
+					// --- Крок 5: MatteControl2 (комбінування) -> fbo1 (використовуємо як тимчасовий) ---
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
+					drawPass(programFinal, fboColorFill.texture, {
+						shrinkAmount: -4.0,
+						texture2: fboSoftMatte.texture
+					});
+
+					// --- Крок 6: Merge1 (фінальний композитинг) -> на екран ---
+					// Малюємо оригінальне зображення
+					drawPass(programFinal, originalTexture, { shrinkBlur: -1.0 }); // Просте копіювання
+
+					// Накладаємо наш результат зверху з оператором Atop
+					gl.enable(gl.BLEND);
+					gl.blendFunc(gl.DST_ALPHA, gl.ZERO); // Blend mode for ATOP
+					drawPass(programFinal, fbo1.texture, { shrinkBlur: -1.0 });
+					gl.disable(gl.BLEND);
+				}
+				return; // Виходимо з render, щоб не виконувати стандартний вивід
+				textureToDraw = originalTexture; // Просто показуємо оригінал
 				enableBlend = true;
 			}
 			break;
@@ -187,12 +238,18 @@ function setupResources() {
 	if (fbo2) { gl.deleteFramebuffer(fbo2.fbo); gl.deleteTexture(fbo2.texture); }
 	if (outputFBO) { gl.deleteFramebuffer(outputFBO.fbo); gl.deleteTexture(outputFBO.texture); }
 	if (fboShrunk) { gl.deleteFramebuffer(fboShrunk.fbo); gl.deleteTexture(fboShrunk.texture); }
+	if (fboHardMatte) { gl.deleteFramebuffer(fboHardMatte.fbo); gl.deleteTexture(fboHardMatte.texture); }
+	if (fboColorFill) { gl.deleteFramebuffer(fboColorFill.fbo); gl.deleteTexture(fboColorFill.texture); }
+	if (fboSoftMatte) { gl.deleteFramebuffer(fboSoftMatte.fbo); gl.deleteTexture(fboSoftMatte.texture); }
 
 	// Створюємо всі FBO з актуальним розміром
 	fbo1 = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	fbo2 = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	outputFBO = createFramebuffer(gl, imageSize[0], imageSize[1]);
 	fboShrunk = createFramebuffer(gl, imageSize[0], imageSize[1]);
+	fboHardMatte = createFramebuffer(gl, imageSize[0], imageSize[1]);
+	fboColorFill = createFramebuffer(gl, imageSize[0], imageSize[1]);
+	fboSoftMatte = createFramebuffer(gl, imageSize[0], imageSize[1]);
 
 	render();
 }
@@ -308,6 +365,7 @@ async function main() {
 			case '0': debugPass = 0; break; // Нормальний режим
 			case '1': debugPass = 1; break; // Показати фон
 			case '2': debugPass = 2; break; // Показати чіткий шар
+			case '5': debugPass = 5; break; // <-- НОВИЙ РЯДОК
 			default: return; // Ігнорувати інші клавіші
 		}
 		event.preventDefault();
