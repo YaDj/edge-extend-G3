@@ -128,33 +128,25 @@ function render() {
 			// Створюємо фінальну композицію в outputFBO
 			gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
 			gl.viewport(0, 0, imgW, imgH);
-			// Очищуємо до ПРОЗОРОГО чорного, щоб було з чим змішувати
-			gl.clearColor(0, 0, 0, 0);
+			gl.clearColor(0, 0, 0, 1.0); // Починаємо з непрозорого чорного
 			gl.clear(gl.COLOR_BUFFER_BIT);
 
-			// --- НОВА, ПРАВИЛЬНА ЛОГІКА ---
-			// 1. Спочатку виправляємо колір фону і зберігаємо його в тимчасовий fbo1
-			gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
-			drawPass(programFinal, fbo2.texture, { shrinkAmount: -2.0 });
+			// Шар 1: Малюємо фон, роблячи його непрозорим. Це наша основа.
+			drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
 
-			// 2. Тепер малюємо цей виправлений фон в outputFBO, одразу конвертуючи його в premultiplied alpha
-			gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
-			drawPass(programFinal, fbo1.texture, { shrinkAmount: 0, shrinkBlur: 0 });
-
-			// 3. Тепер всі шари в одному форматі, і блендінг спрацює
+			// Якщо потрібно, накладаємо верхній шар
 			if (showOriginalOnTop) {
 				gl.enable(gl.BLEND);
 				gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-				// Шар 2: Чіткий край
+				// Малюємо Шар 2 поверх фону. Використовуємо сигнал "просто копіюй".
 				drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
 				gl.disable(gl.BLEND);
 			}
 
 			// Налаштовуємо, щоб на екран малювався результат з outputFBO
 			textureToDraw = outputFBO.texture;
-			uniformsToDraw = { shrinkBlur: -1.0 };
-			// Малюємо на екран, який має свій чорний фон, тому прозорість буде виглядати правильно.
-			enableBlend = true;
+			uniformsToDraw = { shrinkBlur: -1.0 }; // Просто копіюємо
+			enableBlend = false; // Результат вже непрозорий
 			break;
 	}
 

@@ -9,7 +9,7 @@ uniform vec2 u_texelSize;
 uniform float u_shrinkAmount;
 uniform float u_shrinkBlur;
 
-// Ця функція залишається для рендеру фону
+// Ця функція залишається для рендеру фону. Робить колір НЕПРОЗОРИМ.
 vec4 fixColorAndMakeOpaque(vec4 color) {
     if (color.a < 0.001) { return vec4(0.0, 0.0, 0.0, 1.0); }
     return vec4(color.rgb / color.a, 1.0);
@@ -18,19 +18,19 @@ vec4 fixColorAndMakeOpaque(vec4 color) {
 void main() {
   vec4 baseColor = texture(u_image, v_uv);
 
-    // Шлях для рендеру фону
+    // --- КЕРУВАННЯ РЕЖИМАМИ ---
+    // Сигнал для створення непрозорого фону
   if (u_shrinkAmount < -0.5) { 
         outColor = fixColorAndMakeOpaque(baseColor);
     return;
   }
-
-    // Шлях для простого копіювання (використовується в дебаг-режимі)
+    // Сигнал для простого копіювання текстури
 	if (u_shrinkBlur < -0.5) {
 		outColor = baseColor;
 		return;
 	}
 
-    // --- Логіка "SOFT EROSION" ---
+    // --- ОСНОВНА ЛОГІКА: "SOFT EROSION" ---
     
     // Якщо ефекти вимкнені, просто конвертуємо в premultiplied alpha
 	if (u_shrinkBlur <= 0.0 && u_shrinkAmount <= 0.0) {
@@ -39,7 +39,6 @@ void main() {
 	}
 
     // КРОК 1: ЕРОЗІЯ. Знаходимо мінімальну альфу в радіусі u_shrinkAmount.
-    // Це створює жорсткий край.
     float minAlpha = 1.0;
     int kernelRadius = int(ceil(u_shrinkAmount));
     if (kernelRadius > 0) {
@@ -54,9 +53,8 @@ void main() {
         minAlpha = baseColor.a;
   }
 
-    // КРОК 2: ПОМ'ЯКШЕННЯ. Розмиваємо жорсткий край за допомогою u_shrinkBlur.
-    // Це фінальна, правильна формула, що симулює ефект "Blur після Erosion".
-    float softness = u_shrinkBlur * 0.1; // Коефіцієнт для чутливості повзунка
+    // КРОК 2: ПОМ'ЯКШЕННЯ
+    float softness = u_shrinkBlur * 0.1; 
     float threshold = 0.5;
     float smoothedAlpha = smoothstep(threshold - softness, threshold + softness, minAlpha);
     
