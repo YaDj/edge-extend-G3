@@ -168,7 +168,7 @@ function render() {
 					drawPass(programFinal, fbo1.texture, { shrinkBlur: -1.0 });
 					gl.disable(gl.BLEND);
 				}
-				return; // Виходимо з render, щоб не виконувати стандартний вивід
+				break; // Виходимо з render, щоб не виконувати стандартний вивід
 				textureToDraw = originalTexture; // Просто показуємо оригінал
 				enableBlend = true;
 			}
