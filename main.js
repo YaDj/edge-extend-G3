@@ -17,7 +17,7 @@ const shrinkBlurLabel = document.getElementById('shrinkBlurLabel');
 const blendCheckbox = document.getElementById('blendCheckbox');
 
 // --- Глобальні змінні ---
-let programBlur, programFinal, programAlphaBlur;
+let programBlur, programFinal;
 let originalTexture, fbo1, fbo2, outputFBO, fboShrunk, fboHardMatte, fboColorFill, fboSoftMatte;
 let quadBuffer;
 let imageSize = [0, 0];
@@ -88,15 +88,16 @@ function render() {
 	drawFullScreenQuad();
 	gl.disable(gl.BLEND);
 
-	// --- Крок 1: Blur1 (розмиття альфи оригіналу) ---
-	// Виконуємо двопрохідне розмиття ТІЛЬКИ альфи і записуємо результат в fbo2
+	// --- Крок 1: Blur1 (розмиття RGBA) ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programAlphaBlur, originalTexture, { radius: 3.0, texelSize, direction: [1, 0] });
+	// Використовуємо СТАРИЙ, ПРАВИЛЬНИЙ блюр
+	drawPass(programBlur, originalTexture, { radius: 3.0, texelSize, direction: [1, 0] });
 
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programAlphaBlur, fbo1.texture, { radius: 3.0, texelSize, direction: [0, 1] });
+	// І тут також
+	drawPass(programBlur, fbo1.texture, { radius: 3.0, texelSize, direction: [0, 1] });
 
 
 	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
@@ -222,18 +223,16 @@ function saveAlphaMask() {
 // --- Головна функція ---
 async function main() {
 	// Завантажуємо 3 шейдери
-	const [vsSource, fsBlurSource, fsFinalSource, fsAlphaBlurSource] = await Promise.all([
+	const [vsSource, fsBlurSource, fsFinalSource] = await Promise.all([
 		loadShaderSource('shaders/vertex.glsl'),
 		loadShaderSource('shaders/blur.glsl'),
-		loadShaderSource('shaders/final.glsl'),
-		loadShaderSource('shaders/alpha_blur.glsl') // Завантажуємо новий шейдер
+		loadShaderSource('shaders/final.glsl')
 	]);
 
 	programBlur = createProgram(gl, vsSource, fsBlurSource);
 	programFinal = createProgram(gl, vsSource, fsFinalSource);
-	programAlphaBlur = createProgram(gl, vsSource, fsAlphaBlurSource); // Створюємо нову програму
 
-	if (!programBlur || !programFinal || !programAlphaBlur) { return; }
+	if (!programBlur || !programFinal) { return; }
 
 	quadBuffer = gl.createBuffer();
 	drawFullScreenQuad();
