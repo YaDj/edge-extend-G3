@@ -82,137 +82,41 @@ function drawPass(program, inputTexture, uniforms = {}) {
 function render() {
 	if (!originalTexture) return;
 
-	// --- Етап 1 і 2: ЗАВЖДИ генеруємо всі дані ---
-	const radius = parseFloat(radiusSlider.value);
-	const shrinkBlurValue = parseFloat(shrinkBlurSlider.value);
-	radiusLabel.textContent = radius.toFixed(1);
 	const [imgW, imgH] = imageSize;
 	const texelSize = [1 / imgW, 1 / imgH];
+
 	drawFullScreenQuad();
 	gl.disable(gl.BLEND);
 
-	// Етап 1: Рендер розмитого фону -> fbo2
+	// --- Крок 1: Blur1 (розмиття альфи оригіналу) ---
+	// Виконуємо двопрохідне розмиття ТІЛЬКИ альфи і записуємо результат в fbo2
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programBlur, originalTexture, { radius, texelSize, direction: [1, 0] });
+	drawPass(programAlphaBlur, originalTexture, { radius: 3.0, texelSize, direction: [1, 0] });
+
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programBlur, fbo1.texture, { radius, texelSize, direction: [0, 1] });
-
-	// Етап 2: Створення шарів ерозії, якщо потрібно
-	if (showOriginalOnTop) {
-		// 2a: Створюємо чіткий шар ерозії -> fboShrunk
-		gl.bindFramebuffer(gl.FRAMEBUFFER, fboShrunk.fbo);
-		gl.viewport(0, 0, imgW, imgH);
-		gl.clearColor(0, 0, 0, 0);
-		gl.clear(gl.COLOR_BUFFER_BIT);
-		drawPass(programFinal, originalTexture, { shrinkAmount, shrinkBlur: shrinkBlurValue, texelSize });
-
-	}
-
-	// --- Етап 3: Відображення на екран ---
-
-	// 3a. Визначаємо, що саме малювати
-	let textureToDraw;
-	let uniformsToDraw = {};
-	let enableBlend = false;
-
-	switch (debugPass) {
-		case 1:
-			textureToDraw = fbo2.texture;
-			uniformsToDraw = { shrinkAmount: -1.0 };
-			break;
-
-		case 2:
-			if (showOriginalOnTop) {
-				textureToDraw = fboShrunk.texture;
-				uniformsToDraw = { shrinkBlur: -1.0 };
-				enableBlend = true;
-			}
-		case 5: // ДЕБАГ: Крок 1 (Blur1 - розмиття альфи)
-			{
-				console.log("DEBUG: Fusion Comp - Step 1 (Alpha Blur)");
-
-				// --- Крок 1: Blur1 (розмиття альфи оригіналу) ---
-				// Це двопрохідний процес: X -> fbo1, Y -> fbo2
-				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
-				gl.viewport(0, 0, imgW, imgH);
-				drawPass(programAlphaBlur, originalTexture, { radius: 10.0, texelSize, direction: [1, 0] });
-
-				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
-				gl.viewport(0, 0, imgW, imgH);
-				drawPass(programAlphaBlur, fbo1.texture, { radius: 10.0, texelSize, direction: [0, 1] });
-
-				// Налаштовуємо вивід результату цього кроку (з fbo2) на екран
-				textureToDraw = fbo2.texture;
-				uniformsToDraw = { shrinkBlur: -1.0 }; // Просто копіюємо
-				enableBlend = true; // Результат напівпрозорий
-			}
-			break;
+	drawPass(programAlphaBlur, fbo1.texture, { radius: 3.0, texelSize, direction: [0, 1] });
 
 
-		default: // Стандартний режим
-			// Створюємо фінальну композицію в outputFBO
-			gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO.fbo);
-			gl.viewport(0, 0, imgW, imgH);
-			gl.clearColor(0, 0, 0, 1.0); // Починаємо з непрозорого чорного
-			gl.clear(gl.COLOR_BUFFER_BIT);
-
-			// Шар 1: Малюємо фон, роблячи його непрозорим. Це наша основа.
-			drawPass(programFinal, fbo2.texture, { shrinkAmount: -1.0 });
-
-			// Якщо потрібно, накладаємо верхній шар
-			if (showOriginalOnTop) {
-				gl.enable(gl.BLEND);
-				gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-				// Малюємо Шар 2 поверх фону. Використовуємо сигнал "просто копіюй".
-				drawPass(programFinal, fboShrunk.texture, { shrinkBlur: -1.0 });
-				gl.disable(gl.BLEND);
-			}
-
-			// Налаштовуємо, щоб на екран малювався результат з outputFBO
-			textureToDraw = outputFBO.texture;
-			uniformsToDraw = { shrinkBlur: -1.0 }; // Просто копіюємо
-			enableBlend = false; // Результат вже непрозорий
-			break;
-	}
-
-	// 3b. Виконуємо фінальний малюнок на екран
-	// --- ОСНОВНЕ ВИПРАВЛЕННЯ ---
-	// ЗАВЖДИ переконуємось, що ми малюємо на екран (null), а не в останній активний FBO.
+	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
+	// Малюємо результат з fbo2 прямо на екран
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-	gl.clearColor(0.2, 0.2, 0.2, 1.0);
+	gl.clearColor(0.2, 0.2, 0.2, 1.0); // Сірий фон для перевірки прозорості
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
 	const vpX = Math.round((gl.canvas.width / 2) - (imgW * scale / 2) + panX);
 	const vpY = Math.round((gl.canvas.height / 2) - (imgH * scale / 2) - panY);
-	const vpW = Math.round(imgW * scale);
-	const vpH = Math.round(imgH * scale);
-	gl.viewport(vpX, vpY, vpW, vpH);
+	gl.viewport(vpX, vpY, Math.round(imgW * scale), Math.round(imgH * scale));
 
-	// 3c. Виконуємо фінальний малюнок на екран
-	if (textureToDraw) {
-		if (enableBlend) {
-			gl.enable(gl.BLEND);
-			gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-		} else {
-			gl.disable(gl.BLEND);
-		}
+	// Вмикаємо блендінг, щоб бачити прозорість
+	gl.enable(gl.BLEND);
+	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // Використовуємо цей блендінг, бо alpha_blur повертає premultiplied-like alpha
 
-		// Якщо ми в режимі відладки, ми ГАРАНТОВАНО хочемо просто скопіювати текстуру.
-		// Тому ми ігноруємо `uniformsToDraw` і передаємо новий, чистий об'єкт.
-		if (debugPass > 0) {
-			drawPass(programFinal, textureToDraw, { shrinkBlur: -1.0 });
-		} else {
-			// У стандартному режимі ми використовуємо те, що було налаштовано в case default
-			drawPass(programFinal, textureToDraw, uniformsToDraw);
-		}
+	// Використовуємо programFinal з сигналом "просто копіюй"
+	drawPass(programFinal, fbo2.texture, { shrinkBlur: -1.0 });
 
-		if (enableBlend) {
-			gl.disable(gl.BLEND);
-		}
-	}
+	gl.disable(gl.BLEND);
 }
 
 function setupResources() {
