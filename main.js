@@ -191,6 +191,7 @@ function render() {
 	const vpH = Math.round(imgH * scale);
 	gl.viewport(vpX, vpY, vpW, vpH);
 
+	// 3c. Виконуємо фінальний малюнок на екран
 	if (textureToDraw) {
 		if (enableBlend) {
 			gl.enable(gl.BLEND);
@@ -198,9 +199,19 @@ function render() {
 		} else {
 			gl.disable(gl.BLEND);
 		}
-		// Передаємо `shrinkBlur: -1.0` щоб гарантовано викликати режим "простого копіювання"
-		drawPass(programFinal, textureToDraw, { shrinkBlur: -1.0 });
-		if (enableBlend) gl.disable(gl.BLEND);
+
+		// Якщо ми в режимі відладки, ми ГАРАНТОВАНО хочемо просто скопіювати текстуру.
+		// Тому ми ігноруємо `uniformsToDraw` і передаємо новий, чистий об'єкт.
+		if (debugPass > 0) {
+			drawPass(programFinal, textureToDraw, { shrinkBlur: -1.0 });
+		} else {
+			// У стандартному режимі ми використовуємо те, що було налаштовано в case default
+			drawPass(programFinal, textureToDraw, uniformsToDraw);
+		}
+
+		if (enableBlend) {
+			gl.disable(gl.BLEND);
+		}
 	}
 }
 
