@@ -2,7 +2,7 @@ import { createProgram, loadShaderSource, createTexture, createFramebuffer } fro
 
 // --- Елементи DOM, WebGL контекст ---
 const canvas = document.getElementById('glcanvas');
-const gl = canvas.getContext('webgl2', { alpha: false, antialias: true });
+const gl = canvas.getContext('webgl2', { alpha: true, antialias: true });
 if (!gl) { throw new Error('WebGL2 not available'); }
 
 const radiusSlider = document.getElementById('radiusSlider');
@@ -102,12 +102,22 @@ function render() {
 
 	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
 
-	// На цьому кроці ми нічого не робимо, бо fbo2 вже містить потрібний нам результат:
-	// зображення з розмитою альфою. Ми просто виведемо його на екран.
+	// КРОК 2: MatteControl1. Комбінуємо RGB оригіналу з альфою з fbo2.
+	// Результат записуємо в fboHardMatte.
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
+	gl.viewport(0, 0, imgW, imgH);
+	gl.clearColor(0, 0, 0, 0);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+	drawPass(programFinal, originalTexture, {
+		shrinkAmount: -3.0, // Сигнал для режиму MatteControl
+		threshold: 0.99,    // Це значення зараз ігнорується, але залишмо його
+		texture2: fbo2.texture
+	});
 
-	// Малюємо результат з fbo2 прямо на екран
+
+	// Малюємо результат з fboHardMatte на екран
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-	gl.clearColor(0.2, 0.2, 0.2, 1.0);
+	gl.clearColor(0.0, 0.0, 0.0, 0.0); // Очищуємо до прозорого
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
 	const vpX = Math.round((gl.canvas.width / 2) - (imgW * scale / 2) + panX);
@@ -117,8 +127,8 @@ function render() {
 	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-	// Виводимо результат Кроку 1 (з fbo2)
-	drawPass(programFinal, fbo2.texture, { shrinkBlur: -1.0 });
+	// Використовуємо programFinal з сигналом "просто копіюй"
+	drawPass(programFinal, fboHardMatte.texture, { shrinkBlur: -1.0 });
 
 	gl.disable(gl.BLEND);
 }
