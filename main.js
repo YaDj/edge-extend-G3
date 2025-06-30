@@ -137,11 +137,11 @@ function render() {
 				// Це двопрохідний процес: X -> fbo1, Y -> fbo2
 				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 				gl.viewport(0, 0, imgW, imgH);
-				drawPass(programAlphaBlur, originalTexture, { radius: 3.0, texelSize, direction: [1, 0] });
+				drawPass(programAlphaBlur, originalTexture, { radius: 10.0, texelSize, direction: [1, 0] });
 
 				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 				gl.viewport(0, 0, imgW, imgH);
-				drawPass(programAlphaBlur, fbo1.texture, { radius: 3.0, texelSize, direction: [0, 1] });
+				drawPass(programAlphaBlur, fbo1.texture, { radius: 10.0, texelSize, direction: [0, 1] });
 
 				// Налаштовуємо вивід результату цього кроку (з fbo2) на екран
 				textureToDraw = fbo2.texture;
@@ -198,7 +198,8 @@ function render() {
 		} else {
 			gl.disable(gl.BLEND);
 		}
-		drawPass(programFinal, textureToDraw, uniformsToDraw);
+		// Передаємо `shrinkBlur: -1.0` щоб гарантовано викликати режим "простого копіювання"
+		drawPass(programFinal, textureToDraw, { shrinkBlur: -1.0 });
 		if (enableBlend) gl.disable(gl.BLEND);
 	}
 }
