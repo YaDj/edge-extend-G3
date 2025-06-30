@@ -11,6 +11,7 @@ uniform sampler2D u_image2;
 uniform vec2 u_texelSize;
 uniform float u_shrinkAmount;
 uniform float u_shrinkBlur;
+uniform float u_threshold;
 
 // --- НАБІР НАШИХ ФУНКЦІЙ ---
 
@@ -42,13 +43,14 @@ void main() {
 		return;
 	}
 
-    // Режим -3.0: Створити "Hard Matte"
-    if (u_shrinkAmount < -2.5 && u_shrinkAmount > -3.5) {
-        float blurredAlpha = texture(u_image, v_uv).a;
-        float hardAlpha = smoothstep(0.99, 1.0, blurredAlpha);
-        outColor = vec4(vec3(hardAlpha), 1.0); // Записуємо маску в RGB
-        return;
-    }
+	// Режим -3.0: Створити "Hard Matte"
+	if (u_shrinkAmount < -2.5 && u_shrinkAmount > -3.5) {
+		float blurredAlpha = texture(u_image, v_uv).a;
+		// Використовуємо u_threshold для контролю
+		float hardAlpha = smoothstep(u_threshold, u_threshold + 0.01, blurredAlpha);
+		outColor = vec4(vec3(hardAlpha), 1.0);
+		return;
+	}
 
     // Режим -4.0: Скомбінувати колір з інвертованою маскою
     if (u_shrinkAmount < -3.5 && u_shrinkAmount > -4.5) {

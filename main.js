@@ -68,6 +68,9 @@ function drawPass(program, inputTexture, uniforms = {}) {
 	if (uniforms.direction) gl.uniform2fv(gl.getUniformLocation(program, 'u_direction'), uniforms.direction);
 	if (uniforms.shrinkAmount !== undefined) gl.uniform1f(gl.getUniformLocation(program, 'u_shrinkAmount'), uniforms.shrinkAmount);
 	if (uniforms.shrinkBlur !== undefined) gl.uniform1f(gl.getUniformLocation(program, 'u_shrinkBlur'), uniforms.shrinkBlur);
+	if (uniforms.threshold !== undefined) {
+		gl.uniform1f(gl.getUniformLocation(program, 'u_threshold'), uniforms.threshold);
+	}
 	if (uniforms.texture2) {
 		gl.activeTexture(gl.TEXTURE1); // Використовуємо інший текстурний слот
 		gl.bindTexture(gl.TEXTURE_2D, uniforms.texture2);
@@ -144,8 +147,8 @@ function render() {
 				// --- Крок 2: MatteControl1 (створення жорсткої маски) -> fboHardMatte ---
 				gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
 				gl.viewport(0, 0, imgW, imgH);
-				// Беремо результат розмиття альфи з fbo2
-				drawPass(programFinal, fbo2.texture, { shrinkAmount: -3.0 });
+				// Передаємо значення порогу 0.99
+				drawPass(programFinal, fbo2.texture, { shrinkAmount: -3.0, threshold: 0.99 });
 
 				// Налаштовуємо вивід результату цього кроку на екран
 				textureToDraw = fboHardMatte.texture;
