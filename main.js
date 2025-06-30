@@ -114,6 +114,17 @@ function render() {
 		texture2: fbo2.texture
 	});
 
+	// КРОК 3: Blur2 + ChannelBooleans1 (створення кольорової заливки) -> fboColorFill
+	// Спочатку сильно розмиваємо fboHardMatte -> fbo1 (тимчасовий)
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
+	gl.viewport(0, 0, imgW, imgH);
+	drawPass(programBlur, fboHardMatte.texture, { radius: 3.9, texelSize });
+
+	// Потім робимо "Edge Extend" -> fboColorFill
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo);
+	gl.viewport(0, 0, imgW, imgH);
+	drawPass(programFinal, fbo1.texture, { shrinkAmount: -2.0 });
+
 
 	// Малюємо результат з fboHardMatte на екран
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -127,8 +138,8 @@ function render() {
 	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-	// Використовуємо programFinal з сигналом "просто копіюй"
-	drawPass(programFinal, fboHardMatte.texture, { shrinkBlur: -1.0 });
+	// Виводимо результат Кроку 3
+	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 });
 
 	gl.disable(gl.BLEND);
 }
