@@ -129,9 +129,9 @@ function render() {
 				uniformsToDraw = { shrinkBlur: -1.0 };
 				enableBlend = true;
 			}
-		case 5: // ДЕБАГ: Крок 1 і 2 (Створення "Hard Matte")
+		case 5: // ДЕБАГ: Крок 1 (Blur1 - розмиття альфи)
 			{
-				console.log("DEBUG: Fusion Comp - Step 1 & 2 (Hard Matte)");
+				console.log("DEBUG: Fusion Comp - Step 1 (Alpha Blur)");
 
 				// --- Крок 1: Blur1 (розмиття альфи оригіналу) ---
 				// Це двопрохідний процес: X -> fbo1, Y -> fbo2
@@ -143,22 +143,10 @@ function render() {
 				gl.viewport(0, 0, imgW, imgH);
 				drawPass(programAlphaBlur, fbo1.texture, { radius: 3.0, texelSize, direction: [0, 1] });
 
-
-				// --- Крок 2: MatteControl1 (створення жорсткої маски) -> fboHardMatte ---
-				gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
-				gl.viewport(0, 0, imgW, imgH);
-				// u_image = оригінальна текстура (для RGB)
-				// u_image2 = результат розмиття (для A)
-				drawPass(programFinal, originalTexture, {
-					shrinkAmount: -3.0,
-					threshold: 0.99,
-					texture2: fbo2.texture
-				});
-
-				// Налаштовуємо вивід результату цього кроку на екран
-				textureToDraw = fboHardMatte.texture;
-				uniformsToDraw = { shrinkBlur: -1.0 };
-				enableBlend = false;
+				// Налаштовуємо вивід результату цього кроку (з fbo2) на екран
+				textureToDraw = fbo2.texture;
+				uniformsToDraw = { shrinkBlur: -1.0 }; // Просто копіюємо
+				enableBlend = true; // Результат напівпрозорий
 			}
 			break;
 
