@@ -92,30 +92,41 @@ function render() {
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	// Використовуємо СТАРИЙ, ПРАВИЛЬНИЙ блюр
-	drawPass(programBlur, originalTexture, { radius: 3.0, texelSize, direction: [1, 0] });
+	drawPass(programBlur, originalTexture, { radius: 10.0, texelSize, direction: [1, 0] });
 
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	// І тут також
-	drawPass(programBlur, fbo1.texture, { radius: 3.0, texelSize, direction: [0, 1] });
+	drawPass(programBlur, fbo1.texture, { radius: 10.0, texelSize, direction: [0, 1] });
 
 
 	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
-	// Малюємо результат з fbo2 прямо на екран
+
+	// КРОК 2: MatteControl1. Комбінуємо RGB оригіналу з альфою з fbo2.
+	// Результат записуємо в fboHardMatte (ми його тимчасово перевикористаємо).
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
+	gl.viewport(0, 0, imgW, imgH);
+	drawPass(programFinal, originalTexture, {
+		shrinkAmount: -3.0, // Сигнал для режиму MatteControl
+		threshold: 0.99,    // Це значення зараз ігнорується, але залишмо його
+		texture2: fbo2.texture
+	});
+
+
+	// Малюємо результат з fboHardMatte на екран
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-	gl.clearColor(0.2, 0.2, 0.2, 1.0); // Сірий фон для перевірки прозорості
+	gl.clearColor(0.2, 0.2, 0.2, 1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
 	const vpX = Math.round((gl.canvas.width / 2) - (imgW * scale / 2) + panX);
 	const vpY = Math.round((gl.canvas.height / 2) - (imgH * scale / 2) - panY);
 	gl.viewport(vpX, vpY, Math.round(imgW * scale), Math.round(imgH * scale));
 
-	// Вмикаємо блендінг, щоб бачити прозорість
 	gl.enable(gl.BLEND);
-	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // Використовуємо цей блендінг, бо alpha_blur повертає premultiplied-like alpha
+	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
 	// Використовуємо programFinal з сигналом "просто копіюй"
-	drawPass(programFinal, fbo2.texture, { shrinkBlur: -1.0 });
+	drawPass(programFinal, fboHardMatte.texture, { shrinkBlur: -1.0 });
 
 	gl.disable(gl.BLEND);
 }
