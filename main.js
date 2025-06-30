@@ -102,18 +102,10 @@ function render() {
 
 	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
 
-	// КРОК 2: MatteControl1. Комбінуємо RGB оригіналу з альфою з fbo2.
-	// Результат записуємо в fboHardMatte (ми його тимчасово перевикористаємо).
-	gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
-	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programFinal, originalTexture, {
-		shrinkAmount: -3.0, // Сигнал для режиму MatteControl
-		threshold: 0.99,    // Це значення зараз ігнорується, але залишмо його
-		texture2: fbo2.texture
-	});
+	// На цьому кроці ми нічого не робимо, бо fbo2 вже містить потрібний нам результат:
+	// зображення з розмитою альфою. Ми просто виведемо його на екран.
 
-
-	// Малюємо результат з fboHardMatte на екран
+	// Малюємо результат з fbo2 прямо на екран
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.clearColor(0.2, 0.2, 0.2, 1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -125,8 +117,8 @@ function render() {
 	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-	// Використовуємо programFinal з сигналом "просто копіюй"
-	drawPass(programFinal, fboHardMatte.texture, { shrinkBlur: -1.0 });
+	// Виводимо результат Кроку 1 (з fbo2)
+	drawPass(programFinal, fbo2.texture, { shrinkBlur: -1.0 });
 
 	gl.disable(gl.BLEND);
 }
