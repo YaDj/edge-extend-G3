@@ -43,12 +43,19 @@ void main() {
 		return;
 	}
 
-	// Режим -3.0: Створити "Hard Matte"
+	// Режим -3.0: Створити "Hard Matte" (MatteControl1)
 	if (u_shrinkAmount < -2.5 && u_shrinkAmount > -3.5) {
-		float blurredAlpha = texture(u_image, v_uv).a;
-		// Використовуємо u_threshold для контролю
+		// Беремо RGB з u_image (це буде оригінальна текстура)
+		vec3 originalRGB = texture(u_image, v_uv).rgb;
+		
+		// Беремо альфу з u_image2 (це буде результат розмиття альфи)
+		float blurredAlpha = texture(u_image2, v_uv).a;
+		
+		// Застосовуємо жорсткий поріг
 		float hardAlpha = smoothstep(u_threshold, u_threshold + 0.01, blurredAlpha);
-		outColor = vec4(vec3(hardAlpha), 1.0);
+
+		// Повертаємо оригінальний колір, але з новою, жорсткою альфою
+		outColor = vec4(originalRGB, hardAlpha);
 		return;
 	}
 

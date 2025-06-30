@@ -147,8 +147,13 @@ function render() {
 				// --- Крок 2: MatteControl1 (створення жорсткої маски) -> fboHardMatte ---
 				gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
 				gl.viewport(0, 0, imgW, imgH);
-				// Передаємо значення порогу 0.99
-				drawPass(programFinal, fbo2.texture, { shrinkAmount: -3.0, threshold: 0.99 });
+				// u_image = оригінальна текстура (для RGB)
+				// u_image2 = результат розмиття (для A)
+				drawPass(programFinal, originalTexture, {
+					shrinkAmount: -3.0,
+					threshold: 0.99,
+					texture2: fbo2.texture
+				});
 
 				// Налаштовуємо вивід результату цього кроку на екран
 				textureToDraw = fboHardMatte.texture;
