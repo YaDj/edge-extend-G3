@@ -92,12 +92,12 @@ function render() {
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	// Використовуємо СТАРИЙ, ПРАВИЛЬНИЙ блюр
-	drawPass(programBlur, originalTexture, { radius: 10.0, texelSize, direction: [1, 0] });
+	drawPass(programBlur, originalTexture, { radius: 3.0, texelSize, direction: [1, 0] });
 
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	// І тут також
-	drawPass(programBlur, fbo1.texture, { radius: 10.0, texelSize, direction: [0, 1] });
+	drawPass(programBlur, fbo1.texture, { radius: 3.0, texelSize, direction: [0, 1] });
 
 
 	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
@@ -114,21 +114,24 @@ function render() {
 		texture2: fbo2.texture
 	});
 
-	// КРОК 3: Blur2 + ChannelBooleans1 (створення кольорової заливки) -> fboColorFill
-	// Спочатку сильно розмиваємо fboHardMatte -> fbo1 (тимчасовий)
+	// КРОК 3a: Тільки Blur2 (правильна, двопрохідна версія)
+	// Сильно розмиваємо fboHardMatte. Результат буде в fboColorFill.
+	// fbo1 використовується як тимчасовий буфер.
+
+	// Прохід по X: fboHardMatte -> fbo1
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programBlur, fboHardMatte.texture, { radius: 3.9, texelSize });
+	drawPass(programBlur, fboHardMatte.texture, { radius: 3.9, texelSize, direction: [1, 0] });
 
-	// Потім робимо "Edge Extend" -> fboColorFill
+	// Прохід по Y: fbo1 -> fboColorFill
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programFinal, fbo1.texture, { shrinkAmount: -2.0 });
+	drawPass(programBlur, fbo1.texture, { radius: 3.9, texelSize, direction: [0, 1] });
 
 
-	// Малюємо результат з fboHardMatte на екран
+	// Малюємо результат з fboColorFill на екран для перевірки
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-	gl.clearColor(0.0, 0.0, 0.0, 0.0); // Очищуємо до прозорого
+	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
 	const vpX = Math.round((gl.canvas.width / 2) - (imgW * scale / 2) + panX);
@@ -138,7 +141,7 @@ function render() {
 	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-	// Виводимо результат Кроку 3
+	// Виводимо результат Кроку 3a (з fboColorFill)
 	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 });
 
 	gl.disable(gl.BLEND);
