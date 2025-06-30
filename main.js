@@ -17,7 +17,7 @@ const shrinkBlurLabel = document.getElementById('shrinkBlurLabel');
 const blendCheckbox = document.getElementById('blendCheckbox');
 
 // --- Глобальні змінні ---
-let programBlur, programFinal;
+let programBlur, programFinal, programAlphaBlur;
 let originalTexture, fbo1, fbo2, outputFBO, fboShrunk, fboHardMatte, fboColorFill, fboSoftMatte;
 let quadBuffer;
 let imageSize = [0, 0];
@@ -133,17 +133,15 @@ function render() {
 				// --- Крок 1: Blur1 (розмиття альфи оригіналу) -> fbo1 ---
 				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 				gl.viewport(0, 0, imgW, imgH);
-				drawPass(programBlur, originalTexture, { radius: 3.0, texelSize });
+				// Використовуємо НОВУ програму для розмиття тільки альфи
+				drawPass(programAlphaBlur, originalTexture, { radius: 3.0, texelSize });
 
 				// --- Крок 2: MatteControl1 (створення жорсткої маски) -> fboHardMatte ---
 				gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
 				gl.viewport(0, 0, imgW, imgH);
 				drawPass(programFinal, fbo1.texture, { shrinkAmount: -3.0 });
 
-				// Налаштовуємо вивід результату цього кроку на екран
-				textureToDraw = fboHardMatte.texture;
-				uniformsToDraw = { shrinkBlur: -1.0 }; // Просто копіюємо
-				enableBlend = false; // Маска непрозора (записана в RGB)
+				// ... (решта коду case 5 залишається без змін)
 			}
 			break;
 
@@ -306,10 +304,13 @@ async function main() {
 		loadShaderSource('shaders/vertex.glsl'),
 		loadShaderSource('shaders/blur.glsl'),
 		loadShaderSource('shaders/final.glsl'),
+		loadShaderSource('shaders/alpha_blur.glsl')
 	]);
 	programBlur = createProgram(gl, vsSource, fsBlurSource);
 	programFinal = createProgram(gl, vsSource, fsFinalSource);
-	if (!programBlur || !programFinal) { return; }
+	programAlphaBlur = createProgram(gl, vsSource, fsAlphaBlurSource);
+
+	if (!programBlur || !programFinal || !programAlphaBlur) { return; }
 
 	quadBuffer = gl.createBuffer();
 	drawFullScreenQuad();
