@@ -130,18 +130,27 @@ function render() {
 			{
 				console.log("DEBUG: Fusion Comp - Step 1 & 2 (Hard Matte)");
 
-				// --- Крок 1: Blur1 (розмиття альфи оригіналу) -> fbo1 ---
+				// --- Крок 1: Blur1 (розмиття альфи оригіналу) ---
+				// Це двопрохідний процес: X -> fbo1, Y -> fbo2
 				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 				gl.viewport(0, 0, imgW, imgH);
-				// Використовуємо НОВУ програму для розмиття тільки альфи
-				drawPass(programAlphaBlur, originalTexture, { radius: 3.0, texelSize });
+				drawPass(programAlphaBlur, originalTexture, { radius: 3.0, texelSize, direction: [1, 0] });
+
+				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
+				gl.viewport(0, 0, imgW, imgH);
+				drawPass(programAlphaBlur, fbo1.texture, { radius: 3.0, texelSize, direction: [0, 1] });
+
 
 				// --- Крок 2: MatteControl1 (створення жорсткої маски) -> fboHardMatte ---
 				gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
 				gl.viewport(0, 0, imgW, imgH);
-				drawPass(programFinal, fbo1.texture, { shrinkAmount: -3.0 });
+				// Беремо результат розмиття альфи з fbo2
+				drawPass(programFinal, fbo2.texture, { shrinkAmount: -3.0 });
 
-				// ... (решта коду case 5 залишається без змін)
+				// Налаштовуємо вивід результату цього кроку на екран
+				textureToDraw = fboHardMatte.texture;
+				uniformsToDraw = { shrinkBlur: -1.0 };
+				enableBlend = false;
 			}
 			break;
 
@@ -300,15 +309,17 @@ function saveAlphaMask() {
 
 // --- Головна функція ---
 async function main() {
-	const [vsSource, fsBlurSource, fsFinalSource] = await Promise.all([
+	// Завантажуємо 3 шейдери
+	const [vsSource, fsBlurSource, fsFinalSource, fsAlphaBlurSource] = await Promise.all([
 		loadShaderSource('shaders/vertex.glsl'),
 		loadShaderSource('shaders/blur.glsl'),
 		loadShaderSource('shaders/final.glsl'),
-		loadShaderSource('shaders/alpha_blur.glsl')
+		loadShaderSource('shaders/alpha_blur.glsl') // Завантажуємо новий шейдер
 	]);
+
 	programBlur = createProgram(gl, vsSource, fsBlurSource);
 	programFinal = createProgram(gl, vsSource, fsFinalSource);
-	programAlphaBlur = createProgram(gl, vsSource, fsAlphaBlurSource);
+	programAlphaBlur = createProgram(gl, vsSource, fsAlphaBlurSource); // Створюємо нову програму
 
 	if (!programBlur || !programFinal || !programAlphaBlur) { return; }
 
