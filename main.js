@@ -92,12 +92,12 @@ function render() {
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	// Використовуємо СТАРИЙ, ПРАВИЛЬНИЙ блюр
-	drawPass(programBlur, originalTexture, { radius: 3.0, texelSize, direction: [1, 0] });
+	drawPass(programBlur, originalTexture, { radius: 10.0, texelSize, direction: [1, 0] });
 
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 	gl.viewport(0, 0, imgW, imgH);
 	// І тут також
-	drawPass(programBlur, fbo1.texture, { radius: 3.0, texelSize, direction: [0, 1] });
+	drawPass(programBlur, fbo1.texture, { radius: 10.0, texelSize, direction: [0, 1] });
 
 
 	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
@@ -139,7 +139,7 @@ function render() {
 	gl.viewport(vpX, vpY, Math.round(imgW * scale), Math.round(imgH * scale));
 
 	gl.enable(gl.BLEND);
-	gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
 	// Виводимо результат Кроку 3a (з fboColorFill)
 	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 });
