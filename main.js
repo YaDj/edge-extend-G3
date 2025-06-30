@@ -126,51 +126,24 @@ function render() {
 				uniformsToDraw = { shrinkBlur: -1.0 };
 				enableBlend = true;
 			}
-		case 5:
-			if (debugPass === 5) {
-				{ // Використовуємо блок {}, щоб уникнути конфлікту змінних
-					console.log("DEBUG: Running Fusion Comp");
+		case 5: // ДЕБАГ: Крок 1 і 2 (Створення "Hard Matte")
+			{
+				console.log("DEBUG: Fusion Comp - Step 1 & 2 (Hard Matte)");
 
-					// --- Крок 1: Blur1 (розмиття альфи оригіналу) -> fbo1 ---
-					// Ми розмиваємо всі канали, але будемо використовувати тільки альфу
-					drawPass(programBlur, originalTexture, { radius: 3.0, texelSize });
+				// --- Крок 1: Blur1 (розмиття альфи оригіналу) -> fbo1 ---
+				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
+				gl.viewport(0, 0, imgW, imgH);
+				drawPass(programBlur, originalTexture, { radius: 3.0, texelSize });
 
-					// --- Крок 2: MatteControl1 (створення жорсткої маски) -> fboHardMatte ---
-					gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
-					drawPass(programFinal, fbo1.texture, { shrinkAmount: -3.0 });
+				// --- Крок 2: MatteControl1 (створення жорсткої маски) -> fboHardMatte ---
+				gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
+				gl.viewport(0, 0, imgW, imgH);
+				drawPass(programFinal, fbo1.texture, { shrinkAmount: -3.0 });
 
-					// --- Крок 3: Blur2 + ChannelBooleans1 (створення кольорової заливки) -> fboColorFill ---
-					// Спочатку сильно розмиваємо fboHardMatte -> fbo1 (тимчасовий)
-					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
-					drawPass(programBlur, fboHardMatte.texture, { radius: 3.9, texelSize });
-					// Потім робимо "Edge Extend" -> fboColorFill
-					gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo);
-					drawPass(programFinal, fbo1.texture, { shrinkAmount: -2.0 });
-
-					// --- Крок 4: Blur3 (створення м'якої маски) -> fboSoftMatte ---
-					gl.bindFramebuffer(gl.FRAMEBUFFER, fboSoftMatte.fbo);
-					drawPass(programBlur, fboHardMatte.texture, { radius: 1.5, texelSize });
-
-					// --- Крок 5: MatteControl2 (комбінування) -> fbo1 (використовуємо як тимчасовий) ---
-					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
-					drawPass(programFinal, fboColorFill.texture, {
-						shrinkAmount: -4.0,
-						texture2: fboSoftMatte.texture
-					});
-
-					// --- Крок 6: Merge1 (фінальний композитинг) -> на екран ---
-					// Малюємо оригінальне зображення
-					drawPass(programFinal, originalTexture, { shrinkBlur: -1.0 }); // Просте копіювання
-
-					// Накладаємо наш результат зверху з оператором Atop
-					gl.enable(gl.BLEND);
-					gl.blendFunc(gl.DST_ALPHA, gl.ZERO); // Blend mode for ATOP
-					drawPass(programFinal, fbo1.texture, { shrinkBlur: -1.0 });
-					gl.disable(gl.BLEND);
-				}
-				break; // Виходимо з render, щоб не виконувати стандартний вивід
-				textureToDraw = originalTexture; // Просто показуємо оригінал
-				enableBlend = true;
+				// Налаштовуємо вивід результату цього кроку на екран
+				textureToDraw = fboHardMatte.texture;
+				uniformsToDraw = { shrinkBlur: -1.0 }; // Просто копіюємо
+				enableBlend = false; // Маска непрозора (записана в RGB)
 			}
 			break;
 
