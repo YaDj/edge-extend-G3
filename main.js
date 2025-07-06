@@ -88,25 +88,20 @@ function render() {
 	drawFullScreenQuad();
 	gl.disable(gl.BLEND);
 
-	// --- Крок 1: Blur1 (розмиття RGBA) ---
+	// --- Крок 1: Blur1 (розмиття RGBA) -> fbo2 ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	// Використовуємо СТАРИЙ, ПРАВИЛЬНИЙ блюр
 	drawPass(programBlur, originalTexture, { radius: 10.0, texelSize, direction: [1, 0] });
 
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	// І тут також
 	drawPass(programBlur, fbo1.texture, { radius: 10.0, texelSize, direction: [0, 1] });
 
 
-	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
-
-	// КРОК 2: MatteControl1. Комбінуємо RGB оригіналу з альфою з fbo2.
-	// Результат записуємо в fboHardMatte.
+	// --- КРОК 2: MatteControl1 -> fboHardMatte ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	gl.clearColor(0, 0, 0, 0);
+	gl.clearColor(1, 0, 0, 1); // Очищуємо до червоного для дебагу
 	gl.clear(gl.COLOR_BUFFER_BIT);
 	drawPass(programFinal, originalTexture, {
 		shrinkAmount: -3.0, // Сигнал для режиму MatteControl
@@ -114,36 +109,36 @@ function render() {
 		texture2: fbo2.texture
 	});
 
-	// КРОК 3a: Тільки Blur2 (правильна, двопрохідна версія)
-	// Сильно розмиваємо fboHardMatte. Результат буде в fboColorFill.
-	// fbo1 використовується як тимчасовий буфер.
-
-	// Прохід по X: fboHardMatte -> fbo1
+	// --- КРОК 3a: Blur2 -> fboColorFill ---
+	// Очищення тут теж не є строго необхідним, але додамо для чистоти експерименту.
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
+	gl.clearColor(0, 1, 0, 1); // Очищуємо до зеленого
+	gl.clear(gl.COLOR_BUFFER_BIT);
 	drawPass(programBlur, fboHardMatte.texture, { radius: 3.9, texelSize, direction: [1, 0] });
 
 	// Прохід по Y: fbo1 -> fboColorFill
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo);
 	gl.viewport(0, 0, imgW, imgH);
+	gl.clearColor(0, 0, 1, 1); // Очищуємо до синього
+	gl.clear(gl.COLOR_BUFFER_BIT);
 	drawPass(programBlur, fbo1.texture, { radius: 3.9, texelSize, direction: [0, 1] });
 
-	// --- НОВИЙ БЛОК: КРОК 3b: ChannelBooleans1 (Divide) ---
-	// Виконуємо операцію "Edge Extend", щоб відновити яскравість кольорів.
-	// Результат знову записуємо в fboColorFill, використовуючи fbo1 як тимчасовий буфер.
-
-	// 1. Спочатку копіюємо fboColorFill в fbo1, щоб не було feedback loop
-	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
+	// --- КРОК 3b: ChannelBooleans1 (Divide) -> fboColorFill ---
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo); // Копіюємо в тимчасовий буфер
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 }); // Просте копіювання
+	gl.clearColor(1, 1, 0, 1); // Очищуємо до жовтого
+	gl.clear(gl.COLOR_BUFFER_BIT);
+	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 });
 
-	// 2. Тепер читаємо з fbo1, застосовуємо "Divide" і записуємо результат назад в fboColorFill
-	gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo);
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo); // Записуємо назад
 	gl.viewport(0, 0, imgW, imgH);
-	drawPass(programFinal, fbo1.texture, { shrinkAmount: -2.0 }); // Сигнал -2.0 для "Edge Extend"
+	// Тут очищення перезапише результат попереднього кроку, тому воно НЕ ПОТРІБНЕ.
+	// Ми одразу малюємо поверх.
+	drawPass(programFinal, fbo1.texture, { shrinkAmount: -2.0 });
 
 
-	// Малюємо результат з fboColorFill на екран для перевірки
+	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -155,7 +150,7 @@ function render() {
 	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-	// Виводимо результат Кроку 3a (з fboColorFill)
+	// Виводимо результат Кроку 3b (з fboColorFill)
 	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 });
 
 	gl.disable(gl.BLEND);
