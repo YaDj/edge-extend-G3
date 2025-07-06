@@ -298,9 +298,13 @@ async function main() {
 			case '0': debugPass = 0; break; // Нормальний режим
 			case '1': debugPass = 1; break; // Показати фон
 			case '2': debugPass = 2; break; // Показати чіткий шар
-			case '5': // ДЕБАГ: Перевірка результату роботи Blur2 (fboColorFill)
+			case 5: // ДЕБАГ: Перевірка результату роботи Blur2 (fboColorFill)
 				{
 					console.log("DEBUG: Fusion Comp - Step 3a (Blur2) Result");
+
+					// --- ВИПРАВЛЕННЯ: Визначаємо змінні тут ---
+					const [imgW, imgH] = imageSize;
+					const texelSize = [1 / imgW, 1 / imgH];
 
 					// Запускаємо всі попередні кроки, щоб згенерувати fboColorFill
 					// Крок 1 і 2
@@ -317,9 +321,8 @@ async function main() {
 
 					// Налаштовуємо вивід на екран
 					textureToDraw = fboColorFill.texture;
-					// Передаємо сигнал для нового режиму відладки каналів
 					uniformsToDraw = { shrinkAmount: -5.0, shrinkBlur: debugChannel };
-					enableBlend = false; // Наш дебаг-вивід буде непрозорим
+					enableBlend = false;
 				}
 				break;
 			case 'c': // Перемикання каналів
