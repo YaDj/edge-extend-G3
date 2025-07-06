@@ -298,7 +298,7 @@ async function main() {
 			case '0': debugPass = 0; break; // Нормальний режим
 			case '1': debugPass = 1; break; // Показати фон
 			case '2': debugPass = 2; break; // Показати чіткий шар
-			case 5: // ДЕБАГ: Перевірка результату роботи Blur2 (fboColorFill)
+			case '5': // ДЕБАГ: Перевірка результату роботи Blur2 (fboColorFill)
 				{
 					console.log("DEBUG: Fusion Comp - Step 3a (Blur2) Result");
 
