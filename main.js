@@ -101,7 +101,7 @@ function render() {
 	// --- КРОК 2: MatteControl1 -> fboHardMatte ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	gl.clearColor(1, 0, 0, 1); // Очищуємо до червоного для дебагу
+	gl.clearColor(0, 0, 0, 0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 	drawPass(programFinal, originalTexture, {
 		shrinkAmount: -3.0, // Сигнал для режиму MatteControl
@@ -113,28 +113,28 @@ function render() {
 	// Очищення тут теж не є строго необхідним, але додамо для чистоти експерименту.
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	gl.clearColor(0, 1, 0, 1); // Очищуємо до зеленого
+	gl.clearColor(0, 0, 0, 0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
-	drawPass(programBlur, fboHardMatte.texture, { radius: 3.9, texelSize, direction: [1, 0] });
+	drawPass(programBlur, fboHardMatte.texture, { radius: 10.9, texelSize, direction: [1, 0] });
 
 	// Прохід по Y: fbo1 -> fboColorFill
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo);
 	gl.viewport(0, 0, imgW, imgH);
-	gl.clearColor(0, 0, 1, 1); // Очищуємо до синього
+	gl.clearColor(0, 0, 0, 0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
-	drawPass(programBlur, fbo1.texture, { radius: 3.9, texelSize, direction: [0, 1] });
+	drawPass(programBlur, fbo1.texture, { radius: 10.9, texelSize, direction: [0, 1] });
 
 	// --- КРОК 3b: ChannelBooleans1 (Divide) -> fboColorFill ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo); // Копіюємо в тимчасовий буфер
 	gl.viewport(0, 0, imgW, imgH);
-	gl.clearColor(1, 1, 0, 1); // Очищуємо до жовтого
+	gl.clearColor(0, 0, 0, 0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 });
 
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo); // Записуємо назад
 	gl.viewport(0, 0, imgW, imgH);
-	// Тут очищення перезапише результат попереднього кроку, тому воно НЕ ПОТРІБНЕ.
-	// Ми одразу малюємо поверх.
+	gl.clearColor(0, 0, 0, 0);
+	gl.clear(gl.COLOR_BUFFER_BIT);
 	drawPass(programFinal, fbo1.texture, { shrinkAmount: -2.0 });
 
 
