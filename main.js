@@ -150,7 +150,7 @@ function render() {
 		case 5: // Дебаг: результат Blur2 (розмита жорстка маска)
 			textureToDraw = fboColorFill.texture;
 			// Передаємо сигнал для візуалізації каналів
-			uniformsToDraw = { debugMode: debugChannel };
+			uniformsToDraw = { shrinkAmount: -5.0, debugMode: debugChannel };
 			enableBlend = false;
 			break;
 

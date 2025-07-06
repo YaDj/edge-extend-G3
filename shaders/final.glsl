@@ -68,14 +68,9 @@ void main() {
         return;
     }
 
-	// --- НОВИЙ РЕЖИМ: ВІЗУАЛІЗАЦІЯ КАНАЛІВ ---
-	// Тепер керується u_debugMode, а не u_shrinkAmount
-	if (u_debugMode > 0.5) {
-		vec4 color = texture(u_image, v_uv);
-		
-		// u_debugMode тепер є чітким сигналом:
-		// 1.0 = показати RGB
-		// 2.0 = показати Alpha
+	// Режим -5.0: ВІЗУАЛІЗАЦІЯ КАНАЛІВ ---
+   if (u_shrinkAmount < -4.5 && u_shrinkAmount > -5.5) {
+      vec4 color = texture(u_image, v_uv);
 		if (u_debugMode > 1.5) { // Означає, що ми передали 2.0
 			outColor = vec4(vec3(color.a), 1.0);
 		} else { // Означає, що ми передали 1.0
