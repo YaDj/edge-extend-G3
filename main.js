@@ -77,6 +77,9 @@ function drawPass(program, inputTexture, uniforms = {}) {
 		gl.bindTexture(gl.TEXTURE_2D, uniforms.texture2);
 		gl.uniform1i(gl.getUniformLocation(program, 'u_image2'), 1);
 	}
+	if (uniforms.debugMode !== undefined) {
+		gl.uniform1f(gl.getUniformLocation(program, 'u_debugMode'), uniforms.debugMode);
+	}
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
@@ -147,8 +150,8 @@ function render() {
 		case 5: // Дебаг: результат Blur2 (розмита жорстка маска)
 			textureToDraw = fboColorFill.texture;
 			// Передаємо сигнал для візуалізації каналів
-			uniformsToDraw = { shrinkAmount: -5.0, shrinkBlur: debugChannel };
-			enableBlend = false; // Наш дебаг-вивід непрозорий
+			uniformsToDraw = { debugMode: debugChannel };
+			enableBlend = false;
 			break;
 
 		default: // Стандартний режим (поки що просто показуємо результат кроку 2)

@@ -12,6 +12,7 @@ uniform vec2 u_texelSize;
 uniform float u_shrinkAmount;
 uniform float u_shrinkBlur;
 uniform float u_threshold;
+uniform float u_debugMode;
 
 // --- НАБІР НАШИХ ФУНКЦІЙ ---
 
@@ -67,18 +68,21 @@ void main() {
         return;
     }
 
-	 // --- НОВИЙ РЕЖИМ: ВІЗУАЛІЗАЦІЯ КАНАЛІВ ---
-    if (u_shrinkAmount < -4.5 && u_shrinkAmount > -5.5) {
-        vec4 color = texture(u_image, v_uv);
-        if (u_shrinkBlur > 1.5) { // u_shrinkBlur = 2.0
-            // Показуємо альфа-канал як чорно-біле зображення
-            outColor = vec4(vec3(color.a), 1.0);
-        } else { // u_shrinkBlur = 1.0
-            // Показуємо RGB канали як є
-            outColor = vec4(color.rgb, 1.0);
-        }
-        return;
-    }
+	// --- НОВИЙ РЕЖИМ: ВІЗУАЛІЗАЦІЯ КАНАЛІВ ---
+	// Тепер керується u_debugMode, а не u_shrinkAmount
+	if (u_debugMode > 0.5) {
+		vec4 color = texture(u_image, v_uv);
+		
+		// u_debugMode тепер є чітким сигналом:
+		// 1.0 = показати RGB
+		// 2.0 = показати Alpha
+		if (u_debugMode > 1.5) { // Означає, що ми передали 2.0
+			outColor = vec4(vec3(color.a), 1.0);
+		} else { // Означає, що ми передали 1.0
+			outColor = vec4(color.rgb, 1.0);
+		}
+		return;
+	}
     
     // --- Стандартна логіка для простого "Soft Erosion" (залишаємо для дебагу) ---
     vec4 baseColor = texture(u_image, v_uv);
