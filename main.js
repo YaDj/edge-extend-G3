@@ -32,6 +32,7 @@ let panY = 0.0;
 let isPanning = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
+let debugChannel = 1; // 1 = RGB, 2 = Alpha
 let debugPass = 0;
 
 // --- Оголошення ВСІХ функцій-помічників ---
@@ -297,7 +298,34 @@ async function main() {
 			case '0': debugPass = 0; break; // Нормальний режим
 			case '1': debugPass = 1; break; // Показати фон
 			case '2': debugPass = 2; break; // Показати чіткий шар
-			case '5': debugPass = 5; break; // <-- НОВИЙ РЯДОК
+			case '5': // ДЕБАГ: Перевірка результату роботи Blur2 (fboColorFill)
+				{
+					console.log("DEBUG: Fusion Comp - Step 3a (Blur2) Result");
+
+					// Запускаємо всі попередні кроки, щоб згенерувати fboColorFill
+					// Крок 1 і 2
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
+					drawPass(programBlur, originalTexture, { radius: 3.0, texelSize });
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fboHardMatte.fbo);
+					drawPass(programFinal, originalTexture, { shrinkAmount: -3.0, texture2: fbo1.texture, threshold: 0.99 });
+
+					// Крок 3a
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
+					drawPass(programBlur, fboHardMatte.texture, { radius: 3.9, texelSize, direction: [1, 0] });
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo);
+					drawPass(programBlur, fbo1.texture, { radius: 3.9, texelSize, direction: [0, 1] });
+
+					// Налаштовуємо вивід на екран
+					textureToDraw = fboColorFill.texture;
+					// Передаємо сигнал для нового режиму відладки каналів
+					uniformsToDraw = { shrinkAmount: -5.0, shrinkBlur: debugChannel };
+					enableBlend = false; // Наш дебаг-вивід буде непрозорим
+				}
+				break;
+			case 'c': // Перемикання каналів
+				debugChannel = (debugChannel === 1) ? 2 : 1;
+				console.log(`Switched to channel view: ${debugChannel === 1 ? 'RGB' : 'Alpha'}`);
+				break;
 			default: return; // Ігнорувати інші клавіші
 		}
 		event.preventDefault();
