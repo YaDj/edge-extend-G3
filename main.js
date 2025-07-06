@@ -125,21 +125,40 @@ function render() {
 	gl.clear(gl.COLOR_BUFFER_BIT);
 	drawPass(programBlur, fbo1.texture, { radius: 10.9, texelSize, direction: [0, 1] });
 
-	// --- КРОК 3b: ChannelBooleans1 (Divide) -> fboColorFill ---
-	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo); // Копіюємо в тимчасовий буфер
-	gl.viewport(0, 0, imgW, imgH);
-	gl.clearColor(0, 0, 0, 0);
-	gl.clear(gl.COLOR_BUFFER_BIT);
-	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 });
 
-	gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo); // Записуємо назад
-	gl.viewport(0, 0, imgW, imgH);
-	gl.clearColor(0, 0, 0, 0);
-	gl.clear(gl.COLOR_BUFFER_BIT);
-	drawPass(programFinal, fbo1.texture, { shrinkAmount: -2.0 });
+	// --- ЕТАП 2: Вирішуємо, що показати на екрані ---
+	let textureToDraw;
+	let uniformsToDraw = {};
+	let enableBlend = false;
 
+	switch (debugPass) {
+		case 1: // Дебаг: результат Blur1 (розмитий оригінал)
+			textureToDraw = fbo2.texture;
+			uniformsToDraw = { shrinkBlur: -1.0 };
+			enableBlend = true;
+			break;
 
-	// --- ФІНАЛЬНИЙ ВИВІД НА ЕКРАН ---
+		case 2: // Дебаг: результат MatteControl1 (жорстка маска)
+			textureToDraw = fboHardMatte.texture;
+			uniformsToDraw = { shrinkBlur: -1.0 };
+			enableBlend = true;
+			break;
+
+		case 5: // Дебаг: результат Blur2 (розмита жорстка маска)
+			textureToDraw = fboColorFill.texture;
+			// Передаємо сигнал для візуалізації каналів
+			uniformsToDraw = { shrinkAmount: -5.0, shrinkBlur: debugChannel };
+			enableBlend = false; // Наш дебаг-вивід непрозорий
+			break;
+
+		default: // Стандартний режим (поки що просто показуємо результат кроку 2)
+			textureToDraw = fboHardMatte.texture;
+			uniformsToDraw = { shrinkBlur: -1.0 };
+			enableBlend = true;
+			break;
+	}
+
+	// --- ЕТАП 3: Малюємо обрану текстуру на екран ---
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -148,13 +167,18 @@ function render() {
 	const vpY = Math.round((gl.canvas.height / 2) - (imgH * scale / 2) - panY);
 	gl.viewport(vpX, vpY, Math.round(imgW * scale), Math.round(imgH * scale));
 
-	gl.enable(gl.BLEND);
-	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-	// Виводимо результат Кроку 3b (з fboColorFill)
-	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 });
-
-	gl.disable(gl.BLEND);
+	if (textureToDraw) {
+		if (enableBlend) {
+			gl.enable(gl.BLEND);
+			gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+		} else {
+			gl.disable(gl.BLEND);
+		}
+		drawPass(programFinal, textureToDraw, uniformsToDraw);
+		if (enableBlend) {
+			gl.disable(gl.BLEND);
+		}
+	}
 }
 
 function setupResources() {
