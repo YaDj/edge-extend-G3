@@ -128,6 +128,20 @@ function render() {
 	gl.viewport(0, 0, imgW, imgH);
 	drawPass(programBlur, fbo1.texture, { radius: 3.9, texelSize, direction: [0, 1] });
 
+	// --- НОВИЙ БЛОК: КРОК 3b: ChannelBooleans1 (Divide) ---
+	// Виконуємо операцію "Edge Extend", щоб відновити яскравість кольорів.
+	// Результат знову записуємо в fboColorFill, використовуючи fbo1 як тимчасовий буфер.
+
+	// 1. Спочатку копіюємо fboColorFill в fbo1, щоб не було feedback loop
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo1.fbo);
+	gl.viewport(0, 0, imgW, imgH);
+	drawPass(programFinal, fboColorFill.texture, { shrinkBlur: -1.0 }); // Просте копіювання
+
+	// 2. Тепер читаємо з fbo1, застосовуємо "Divide" і записуємо результат назад в fboColorFill
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fboColorFill.fbo);
+	gl.viewport(0, 0, imgW, imgH);
+	drawPass(programFinal, fbo1.texture, { shrinkAmount: -2.0 }); // Сигнал -2.0 для "Edge Extend"
+
 
 	// Малюємо результат з fboColorFill на екран для перевірки
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
